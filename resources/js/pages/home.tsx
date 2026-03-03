@@ -1,7 +1,13 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, MapPinned, Mail, Package, Phone, Play, ShoppingCart, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, Mail, Package, Phone, Play, ShoppingCart, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import HeroBanner from '@/components/user/HeroBanner';
+import DailyHomeSections from '@/components/user/home/daily/DailyHomeSections';
+import SocietyCategoriesSection from '@/components/user/home/society/SocietyCategoriesSection';
+import SocietyDeliveryMarqueeSection from '@/components/user/home/society/SocietyDeliveryMarqueeSection';
+import SocietyHomeSections from '@/components/user/home/society/SocietyHomeSections';
+import SocietyProductsSection from '@/components/user/home/society/SocietyProductsSection';
+import SocietySubscriptionStepsSection from '@/components/user/home/society/SocietySubscriptionStepsSection';
 import ProductCardMedia, { type MediaItem } from '@/components/user/ProductCardMedia';
 import UserLayout from '@/layouts/UserLayout';
 import { product as productRoute } from '@/routes/catalog';
@@ -147,7 +153,10 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const [similarCardMediaIndex, setSimilarCardMediaIndex] = useState<Record<string, number>>({});
     const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
     const [storyProgress, setStoryProgress] = useState(0);
-    const auth = (usePage().props as { auth?: { user?: unknown; wishlisted_products?: number[] } }).auth;
+    const page = usePage<{ auth?: { user?: unknown; wishlisted_products?: number[] } }>();
+    const auth = page.props.auth;
+    const [, currentQuery = ''] = page.url.split('?');
+    const selectedVertical = new URLSearchParams(currentQuery).get('vertical') === 'daily_fresh' ? 'daily_fresh' : 'society_fresh';
     const wishlistedProductIds = new Set(auth?.wishlisted_products || []);
     const [selectedVariants, setSelectedVariants] = useState<Record<number, number>>({});
     const [categoryActivePage, setCategoryActivePage] = useState(0);
@@ -303,6 +312,18 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const goPrevTestimonial = () => setTestimonialIndex((i) => Math.max(0, i - 1));
     const goNextTestimonial = () => setTestimonialIndex((i) => Math.min(testimonialMaxIndex, i + 1));
 
+    if (selectedVertical === 'daily_fresh') {
+        return (
+            <UserLayout>
+                <Head title="FreshTick - Daily Fresh" />
+
+                <HeroBanner banners={banners} autoPlay={true} interval={5000} />
+
+                <DailyHomeSections />
+            </UserLayout>
+        );
+    }
+
     return (
         <UserLayout>
             <Head title="FreshTick - Fresh Dairy Delivered Daily" />
@@ -310,727 +331,63 @@ export default function Home({ banners, categories, products = [], subscriptionP
             {/* Hero Banner Section - Compact with thumbnails */}
             <HeroBanner banners={banners} autoPlay={true} interval={5000} />
 
-            {/* We deliver to – compact marquee, no margin */}
-            <section className="marquee-dark mt-0 overflow-hidden border-y border-gray-700/50 py-2 sm:py-2.5">
-                <div className="flex items-center overflow-hidden">
-                    <div className="animate-marquee-slow flex flex-1 items-center whitespace-nowrap">
-                        {[...Array(3)].map((_, copyIndex) => (
-                            <div key={copyIndex} className="flex min-w-max items-center gap-1.5 px-4 sm:gap-2 sm:px-6">
-                                <span className="inline-flex items-center gap-1 text-xs font-bold tracking-wide text-(--theme-secondary) uppercase sm:text-sm">
-                                    <MapPinned className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                                    We deliver to
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-xs font-bold tracking-wide text-(--theme-secondary) uppercase sm:text-sm">
-                                    <MapPinned className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                                    Ernakulam
-                                </span>
-                                {['Kaloor', 'Panampilly Nagar', 'High Court (Kochi)', 'Nayarambalam'].map((location) => (
-                                    <span
-                                        key={`ern-${copyIndex}-${location}`}
-                                        className="inline-flex items-center gap-1 text-xs font-medium text-white/70 sm:text-sm"
+            <SocietyHomeSections>
+                <SocietyDeliveryMarqueeSection />
+
+                <SocietyCategoriesSection
+                    categories={categories}
+                    categorySliderRef={categorySliderRef}
+                    categoryActivePage={categoryActivePage}
+                    setCategoryActivePage={setCategoryActivePage}
+                />
+
+                <SocietySubscriptionStepsSection />
+
+                <SocietyProductsSection
+                    products={products}
+                    wishlistedProductIds={wishlistedProductIds}
+                    productSliderRef={productSliderRef}
+                    productActivePage={productActivePage}
+                    setProductActivePage={setProductActivePage}
+                    setSelectedVariants={setSelectedVariants}
+                    similarCardMediaIndex={similarCardMediaIndex}
+                    setSimilarCardMediaIndexForKey={setSimilarCardMediaIndexForKey}
+                    toggleProductWishlist={toggleProductWishlist}
+                    getDisplayPrice={getDisplayPrice}
+                    getSelectedVariantId={getSelectedVariantId}
+                    getSafeUrl={getSafeUrl}
+                    formatPrice={formatPrice}
+                />
+
+                {/* Why Choose Us – Auto-scrolling Slider with Consistent Pattern */}
+                <section className="bg-linear-to-b from-white via-gray-50/50 to-white py-10 sm:py-12 lg:py-14" aria-labelledby="why-choose-heading">
+                    <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+                        {/* Centered Header with Icon */}
+                        <div className="mb-6 flex flex-col items-center justify-center sm:mb-5">
+                            <div className="flex items-center gap-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
+                                    <svg
+                                        className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
                                     >
-                                        <MapPin className="h-3 w-3 shrink-0" strokeWidth={2} />
-                                        {location}
-                                    </span>
-                                ))}
-                                <span className="inline-flex items-center gap-1 text-xs font-bold tracking-wide text-(--theme-secondary) uppercase sm:text-sm">
-                                    <MapPinned className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
-                                    Malappuram
-                                </span>
-                                {['Malipuram', 'Alathurpadi'].map((location) => (
-                                    <span
-                                        key={`mal-${copyIndex}-${location}`}
-                                        className="inline-flex items-center gap-1 text-xs font-medium text-white/70 sm:text-sm"
-                                    >
-                                        <MapPin className="h-3 w-3 shrink-0" strokeWidth={2} />
-                                        {location}
-                                    </span>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Trending Product Categories - Slider with Navigation */}
-            <section className="bg-white py-10 sm:py-12 lg:py-14" aria-labelledby="trending-categories-heading">
-                <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Compact Header with Icon and Nav Buttons */}
-                    <div className="mb-6 flex items-center justify-between sm:mb-5">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
-                                <Package className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5" />
-                            </div>
-                            <div>
-                                <h2 id="trending-categories-heading" className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">
-                                    Browse Categories
-                                </h2>
-                                <p className="text-xs text-gray-400 sm:text-sm">Fresh dairy delivered</p>
-                            </div>
-                        </div>
-
-                        {/* Web: Nav buttons near View All */}
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const slider = document.getElementById('category-slider');
-                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 6, behavior: 'smooth' });
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                                aria-label="Previous categories"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const slider = document.getElementById('category-slider');
-                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 6, behavior: 'smooth' });
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                                aria-label="Next categories"
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </button>
-                            <Link
-                                href="/products"
-                                className="ml-2 rounded-lg border border-(--theme-primary-1) px-3 py-1.5 text-xs font-medium text-(--theme-primary-1) transition-all hover:bg-(--theme-primary-1) hover:text-white sm:text-sm"
-                            >
-                                View All
-                            </Link>
-                        </div>
-
-                        {/* Mobile: View All only */}
-                        <Link
-                            href="/products"
-                            className="rounded-lg border border-(--theme-primary-1) px-3 py-1.5 text-xs font-medium text-(--theme-primary-1) transition-all hover:bg-(--theme-primary-1) hover:text-white sm:text-sm lg:hidden"
-                        >
-                            View All
-                        </Link>
-                    </div>
-
-                    {/* Category Slider */}
-                    <div
-                        ref={categorySliderRef}
-                        id="category-slider"
-                        className="scrollbar-hide flex snap-x snap-mandatory gap-2 overflow-x-auto sm:gap-3 lg:gap-3"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        onScroll={() => {
-                            const slider = categorySliderRef.current;
-                            if (slider) {
-                                const scrollLeft = slider.scrollLeft;
-                                const maxScroll = slider.scrollWidth - slider.clientWidth;
-                                const pageCount = Math.ceil(categories.length / (window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 3 : 6));
-                                const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
-                                setCategoryActivePage(Math.min(currentPage, pageCount - 1));
-                            }
-                        }}
-                    >
-                        {categories.map((category) => (
-                            <Link
-                                key={category.id}
-                                href={`/products?category=${category.slug}`}
-                                className="group relative w-[calc(50%-4px)] shrink-0 snap-start overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-100 transition-all duration-200 hover:shadow-md hover:ring-(--theme-primary-1)/20 sm:w-[calc(33.333%-8px)] lg:w-[calc(16.666%-10px)]"
-                            >
-                                <div className="aspect-square w-full overflow-hidden bg-linear-to-br from-gray-50 to-gray-100">
-                                    {category.image ? (
-                                        <img
-                                            src={category.image}
-                                            alt={category.name}
-                                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
-                                            loading="lazy"
-                                        />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-(--theme-primary-1)/10 to-(--theme-primary-1)/5">
-                                            <Package className="h-6 w-6 text-(--theme-primary-1)/30 sm:h-8 sm:w-8" strokeWidth={1.5} />
-                                        </div>
-                                    )}
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
                                 </div>
-                                {/* Overlay with name */}
-                                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/60 to-transparent p-1.5 sm:p-2">
-                                    <h3 className="truncate text-center text-[10px] font-medium text-white sm:text-xs">{category.name}</h3>
+                                <div className="text-center">
+                                    <h2 id="why-choose-heading" className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">
+                                        Why Choose Us
+                                    </h2>
+                                    <p className="text-xs text-gray-400 sm:text-sm">Building trust through quality</p>
                                 </div>
-                            </Link>
-                        ))}
-                    </div>
-
-                    {/* Mobile: Bottom Navigation with Pagination */}
-                    <div className="mt-4 flex items-center justify-center gap-4 lg:hidden">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('category-slider');
-                                if (slider) {
-                                    const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 3;
-                                    slider.scrollBy({ left: -cardWidth, behavior: 'smooth' });
-                                }
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                            aria-label="Previous categories"
-                        >
-                            <ChevronLeft className="h-5 w-5" />
-                        </button>
-
-                        {/* Pagination Dots */}
-                        <div className="flex items-center gap-1.5">
-                            {Array.from({
-                                length: Math.min(
-                                    5,
-                                    Math.ceil(categories.length / (typeof window !== 'undefined' && window.innerWidth < 640 ? 2 : 3)),
-                                ),
-                            }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => {
-                                        const slider = categorySliderRef.current;
-                                        if (slider) {
-                                            const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 3;
-                                            slider.scrollTo({ left: i * cardWidth * (window.innerWidth < 640 ? 2 : 3), behavior: 'smooth' });
-                                        }
-                                    }}
-                                    className={`h-2 w-2 rounded-full transition-colors ${
-                                        i === categoryActivePage ? 'bg-(--theme-primary-1)' : 'bg-gray-300 hover:bg-gray-400'
-                                    }`}
-                                    aria-label={`Go to page ${i + 1}`}
-                                />
-                            ))}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('category-slider');
-                                if (slider) {
-                                    const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 3;
-                                    slider.scrollBy({ left: cardWidth, behavior: 'smooth' });
-                                }
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                            aria-label="Next categories"
-                        >
-                            <ChevronRight className="h-5 w-5" />
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            {/* How Subscription Works Section - Compact Enhanced */}
-            <section
-                className="relative overflow-hidden bg-linear-to-b from-gray-50 to-gray-100 py-10 sm:py-12 lg:py-14"
-                aria-labelledby="subscription-steps-heading"
-            >
-                {/* Background decorative icons */}
-                <div className="section-icon-bg pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
-                    <img
-                        src="/images/icons/milk-bottle.png"
-                        alt=""
-                        className="absolute top-[12%] left-[2%] h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
-                        style={{ opacity: 0.05, transform: 'rotate(-18deg)' }}
-                    />
-                    <img
-                        src="/images/icons/farm.png"
-                        alt=""
-                        className="absolute top-[10%] right-[4%] h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-                        style={{ opacity: 0.04, transform: 'rotate(14deg)' }}
-                    />
-                    <img
-                        src="/images/icons/animal.png"
-                        alt=""
-                        className="absolute bottom-[18%] left-[1%] h-8 w-8 sm:h-10 sm:w-10"
-                        style={{ opacity: 0.04, transform: 'rotate(10deg)' }}
-                    />
-                    <img
-                        src="/images/icons/milk-bottle%20(1).png"
-                        alt=""
-                        className="absolute right-[7%] bottom-[12%] h-10 w-10 sm:h-12 sm:w-12"
-                        style={{ opacity: 0.05, transform: 'rotate(-12deg)' }}
-                    />
-                    <img
-                        src="/images/icons/discount.png"
-                        alt=""
-                        className="absolute top-1/2 left-[18%] h-6 w-6 -translate-y-1/2 sm:h-8 sm:w-8"
-                        style={{ opacity: 0.03, transform: 'rotate(18deg)' }}
-                    />
-                    <img
-                        src="/images/icons/milk%20(1).png"
-                        alt=""
-                        className="absolute top-1/2 right-[20%] h-6 w-6 -translate-y-1/2 sm:h-8 sm:w-8"
-                        style={{ opacity: 0.04, transform: 'rotate(-10deg)' }}
-                    />
-                </div>
-                <style>{`
-                        @keyframes blob-bounce {
-                            0% { transform: translate(-100%, -100%) translate3d(0, 0, 0); }
-                            25% { transform: translate(-100%, -100%) translate3d(100%, 0, 0); }
-                            50% { transform: translate(-100%, -100%) translate3d(100%, 100%, 0); }
-                            75% { transform: translate(-100%, -100%) translate3d(0, 100%, 0); }
-                            100% { transform: translate(-100%, -100%) translate3d(0, 0, 0); }
-                        }
-                        .subscription-card {
-                            position: relative;
-                            border-radius: 12px;
-                            z-index: 1111;
-                            overflow: hidden;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-                            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                        }
-                        .subscription-card:hover {
-                            transform: translateY(-6px);
-                            box-shadow: 0 16px 20px -4px rgba(0, 0, 0, 0.1), 0 8px 8px -4px rgba(0, 0, 0, 0.04);
-                        }
-                        .subscription-card-bg {
-                            position: absolute;
-                            top: 4px;
-                            left: 4px;
-                            right: 4px;
-                            bottom: 4px;
-                            z-index: 2;
-                            background: rgba(255, 255, 255, .95);
-                            backdrop-filter: blur(20px);
-                            border-radius: 8px;
-                            overflow: hidden;
-                            outline: 2px solid white;
-                            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                        }
-                        .subscription-card:hover .subscription-card-bg {
-                            box-shadow: 0 0 0 2px rgba(58, 154, 133, 0.25);
-                        }
-                        .subscription-card-blob {
-                            position: absolute;
-                            z-index: 1;
-                            top: 50%;
-                            left: 50%;
-                            width: 120px;
-                            height: 120px;
-                            border-radius: 50%;
-                            opacity: 1;
-                            filter: blur(10px);
-                            animation: blob-bounce 5s infinite ease;
-                            transition: opacity 0.4s ease;
-                        }
-                        .subscription-card:hover .subscription-card-blob {
-                            opacity: 0.8;
-                        }
-                        @media (max-width: 640px) {
-                            .subscription-card-blob {
-                                width: 80px;
-                                height: 80px;
-                            }
-                        }
-                    `}</style>
-                <div className="relative z-10 container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Compact Header with Icon - Row Layout */}
-                    <div className="mb-6 flex flex-row items-center justify-center gap-3 sm:mb-5 sm:gap-4">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
-                            <svg
-                                className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                />
-                            </svg>
-                        </div>
-                        <div className="text-left">
-                            <h2 id="subscription-steps-heading" className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">
-                                How Subscription Works
-                            </h2>
-                            <p className="text-xs text-gray-400 sm:text-sm">Simple steps to get fresh dairy</p>
-                        </div>
-                    </div>
-
-                    {/* Enhanced Compact Cards Grid - Aligned with Categories */}
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-4">
-                        {[
-                            {
-                                step: '1',
-                                title: 'Choose Products',
-                                description: 'Milk, curd, paneer, ghee',
-                                image: '/images/dairy-products.png',
-                                imageAlt: 'Dairy products',
-                                blobColor: 'var(--theme-primary-1)',
-                            },
-                            {
-                                step: '2',
-                                title: 'Set Quantity & Schedule',
-                                description: 'Daily / Alternate days',
-                                image: '/images/calendar.png',
-                                imageAlt: 'Calendar schedule',
-                                blobColor: 'var(--theme-secondary)',
-                            },
-                            {
-                                step: '3',
-                                title: 'We Deliver Every Morning',
-                                description: 'Fresh before 7 AM',
-                                image: '/images/motorbike.png',
-                                imageAlt: 'Delivery',
-                                blobColor: 'var(--theme-primary-1)',
-                            },
-                            {
-                                step: '4',
-                                title: 'Pause / Modify Anytime',
-                                description: 'Full control, no lock-in',
-                                image: '/images/pause.png',
-                                imageAlt: 'Pause or modify',
-                                blobColor: 'var(--theme-secondary)',
-                            },
-                        ].map((item, index) => (
-                            <article
-                                key={`step-${index}`}
-                                className="subscription-card group relative h-full min-h-50 w-full overflow-hidden sm:min-h-60 lg:min-h-70"
-                            >
-                                {/* Animated Blob Background */}
-                                <div className="subscription-card-blob" style={{ backgroundColor: item.blobColor }} />
-                                {/* Step Number Badge */}
-                                <div className="absolute top-3 left-3 z-30 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-xs font-bold text-(--theme-primary-1) shadow-sm sm:top-4 sm:left-4 sm:h-7 sm:w-7 sm:text-sm">
-                                    {item.step}
-                                </div>
-                                {/* Card Content */}
-                                <div className="subscription-card-bg flex flex-col items-center justify-center p-4 sm:p-5">
-                                    {/* Image Container with Enhanced Hover */}
-                                    <div className="mb-4 flex shrink-0 flex-col items-center">
-                                        <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-linear-to-br from-(--theme-primary-1)/10 to-(--theme-primary-1)/5 p-2.5 shadow-inner transition-all duration-400 group-hover:scale-110 group-hover:shadow-(--theme-primary-1)/10 group-hover:shadow-lg sm:h-24 sm:w-24 sm:p-3 lg:h-28 lg:w-28">
-                                            {/* Subtle ring on hover */}
-                                            <div className="absolute inset-0 rounded-2xl ring-1 ring-black/5 ring-inset group-hover:ring-(--theme-primary-1)/20" />
-                                            <img
-                                                src={item.image}
-                                                alt={item.imageAlt}
-                                                className="h-full w-full object-contain transition-transform duration-400 group-hover:scale-110"
-                                                loading="lazy"
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* Title with Enhanced Typography */}
-                                    <h3 className="mb-2 text-center text-sm leading-tight font-bold text-gray-800 transition-colors duration-300 group-hover:text-(--theme-primary-1) sm:text-base">
-                                        {item.title}
-                                    </h3>
-                                    {/* Description with Better Visual Hierarchy */}
-                                    <p className="text-center text-[11px] leading-relaxed font-medium text-gray-500 transition-colors duration-300 group-hover:text-gray-700 sm:text-xs">
-                                        {item.description}
-                                    </p>
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Our Products – Slider with Navigation (Same layout as Categories) */}
-            <section id="products" className="bg-linear-to-b from-white to-gray-50/30 py-10 sm:py-12 lg:py-14" aria-labelledby="products-heading">
-                <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Compact Header with Icon and Nav Buttons */}
-                    <div className="mb-6 flex items-center justify-between sm:mb-5">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
-                                <Package className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5" />
-                            </div>
-                            <div>
-                                <h2 id="products-heading" className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">
-                                    Our Products
-                                </h2>
-                                <p className="text-xs text-gray-400 sm:text-sm">Fresh dairy delivered</p>
                             </div>
                         </div>
 
-                        {/* Web: Nav buttons near View All */}
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const slider = document.getElementById('product-slider');
-                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 4, behavior: 'smooth' });
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                                aria-label="Previous products"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const slider = document.getElementById('product-slider');
-                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 4, behavior: 'smooth' });
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                                aria-label="Next products"
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </button>
-                            <Link
-                                href="/products"
-                                className="ml-2 rounded-lg border border-(--theme-primary-1) px-3 py-1.5 text-xs font-medium text-(--theme-primary-1) transition-all hover:bg-(--theme-primary-1) hover:text-white sm:text-sm"
-                            >
-                                View All
-                            </Link>
-                        </div>
-
-                        {/* Mobile: View All only */}
-                        <Link
-                            href="/products"
-                            className="rounded-lg border border-(--theme-primary-1) px-3 py-1.5 text-xs font-medium text-(--theme-primary-1) transition-all hover:bg-(--theme-primary-1) hover:text-white sm:text-sm lg:hidden"
-                        >
-                            View All
-                        </Link>
-                    </div>
-
-                    {/* Product Slider */}
-                    <div
-                        ref={productSliderRef}
-                        id="product-slider"
-                        className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-4 lg:gap-4"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        onScroll={() => {
-                            const slider = productSliderRef.current;
-                            if (slider) {
-                                const scrollLeft = slider.scrollLeft;
-                                const maxScroll = slider.scrollWidth - slider.clientWidth;
-                                const pageCount = Math.ceil(products.length / (window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 2 : 4));
-                                const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
-                                setProductActivePage(Math.min(currentPage, pageCount - 1));
-                            }
-                        }}
-                    >
-                        {products.map((product) => {
-                            const isWishlisted = wishlistedProductIds.has(product.id);
-                            const displayPrice = getDisplayPrice(product);
-                            const activeVariantId = getSelectedVariantId(product);
-                            const hasVariants = product.variants.length > 0;
-                            const hasDiscount = product.compare_at_price && product.compare_at_price > displayPrice;
-                            const discountPct = hasDiscount
-                                ? Math.round(((product.compare_at_price! - displayPrice) / product.compare_at_price!) * 100)
-                                : 0;
-                            const isPlan = product.is_subscription_eligible;
-
-                            const mediaList: MediaItem[] = [];
-                            if (product.images && product.images.length > 0) {
-                                product.images.forEach((img) => mediaList.push({ type: 'image', url: getSafeUrl(img) }));
-                            } else if (product.image) {
-                                mediaList.push({ type: 'image', url: getSafeUrl(product.image) });
-                            } else {
-                                mediaList.push({ type: 'image', url: '/placeholder.png' });
-                            }
-
-                            return (
-                                <article
-                                    key={product.id}
-                                    className="group relative flex w-[calc(50%-6px)] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:border-(--theme-primary-1)/40 hover:shadow-lg sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)]"
-                                >
-                                    {/* ── Image area ── */}
-                                    <Link
-                                        href={productRoute(product.slug)}
-                                        className="relative aspect-square w-full overflow-hidden bg-(--theme-secondary)/10 sm:aspect-4/3"
-                                    >
-                                        <ProductCardMedia
-                                            media={mediaList}
-                                            alt={product.name}
-                                            productKey={product.id.toString()}
-                                            currentIndexMap={similarCardMediaIndex}
-                                            onIndexChange={setSimilarCardMediaIndexForKey}
-                                            className="h-full w-full"
-                                            imageClassName="group-hover:scale-105"
-                                        />
-                                        {/* Discount badge */}
-                                        {hasDiscount && (
-                                            <span className="absolute top-2 left-2 z-10 rounded-md bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white shadow sm:text-[10px]">
-                                                {discountPct}% OFF
-                                            </span>
-                                        )}
-                                        {/* Wishlist */}
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                toggleProductWishlist(product.id);
-                                            }}
-                                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white sm:h-8 sm:w-8"
-                                        >
-                                            <Heart
-                                                className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'text-gray-400 group-hover:text-red-400'}`}
-                                                strokeWidth={2}
-                                            />
-                                        </button>
-                                    </Link>
-
-                                    {/* ── Card body ── */}
-                                    <div className="flex flex-1 flex-col p-2.5 sm:p-3">
-                                        {/* Product name */}
-                                        <Link href={productRoute(product.slug)}>
-                                            <h3 className="mb-1 line-clamp-1 text-xs font-semibold text-gray-800 transition-colors group-hover:text-(--theme-primary-1) sm:text-sm">
-                                                {product.name}
-                                            </h3>
-                                        </Link>
-
-                                        {/* Unit / weight / Subscription info */}
-                                        {isPlan ? (
-                                            <p className="mb-1.5 text-[10px] font-medium text-gray-600 sm:text-xs">Subscription Available</p>
-                                        ) : product.unit ? (
-                                            <p className="mb-1.5 text-[10px] text-gray-400 sm:text-xs">
-                                                {product.weight ? `${product.weight} ${product.unit}` : product.unit}
-                                            </p>
-                                        ) : null}
-
-                                        {/* Variant selector pills */}
-                                        {hasVariants && !isPlan && (
-                                            <div className="mb-2 flex flex-wrap gap-1">
-                                                {product.variants
-                                                    .filter((v) => v.is_active)
-                                                    .map((v) => (
-                                                        <button
-                                                            key={v.id}
-                                                            type="button"
-                                                            onClick={() => setSelectedVariants((prev) => ({ ...prev, [product.id]: v.id }))}
-                                                            className={`rounded-md border px-2 py-0.5 text-[9px] font-medium transition-all sm:text-[10px] ${
-                                                                activeVariantId === v.id
-                                                                    ? 'border-(--theme-primary-1) bg-(--theme-primary-1)/10 text-(--theme-primary-1)'
-                                                                    : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300'
-                                                            }`}
-                                                        >
-                                                            {v.name}
-                                                        </button>
-                                                    ))}
-                                            </div>
-                                        )}
-
-                                        {/* Price row */}
-                                        {!isPlan && (
-                                            <div className="mt-auto mb-2 flex items-baseline gap-1.5">
-                                                <span className="text-sm font-bold text-(--theme-primary-1) sm:text-base">
-                                                    {formatPrice(displayPrice)}
-                                                </span>
-                                                {hasDiscount && (
-                                                    <span className="text-[10px] text-gray-400 line-through sm:text-xs">
-                                                        {formatPrice(product.compare_at_price!)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-                                        {isPlan && (
-                                            <div className="mt-auto mb-2 flex items-baseline gap-1.5">
-                                                <span className="text-sm font-bold text-(--theme-primary-1) sm:text-base">
-                                                    {formatPrice(displayPrice)}/ Unit
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        <Link
-                                            href={isPlan ? `/subscription?product=${product.id}` : productRoute(product.slug)}
-                                            className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-md bg-(--theme-primary-1) py-2 text-center text-[11px] font-semibold text-white shadow-sm transition-all duration-200 hover:bg-(--theme-primary-1-dark) hover:shadow-md active:scale-[0.97] sm:py-2.5 sm:text-xs"
-                                        >
-                                            {isPlan ? (
-                                                'Subscribe'
-                                            ) : (
-                                                <>
-                                                    <ShoppingCart className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={2.5} />
-                                                    Add to Cart
-                                                </>
-                                            )}
-                                        </Link>
-                                    </div>
-                                </article>
-                            );
-                        })}
-                    </div>
-
-                    {/* Mobile: Bottom Navigation with Pagination */}
-                    <div className="mt-4 flex items-center justify-center gap-4 lg:hidden">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('product-slider');
-                                if (slider) {
-                                    const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 2;
-                                    slider.scrollBy({ left: -cardWidth, behavior: 'smooth' });
-                                }
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                            aria-label="Previous products"
-                        >
-                            <ChevronLeft className="h-5 w-5" />
-                        </button>
-
-                        {/* Pagination Dots */}
-                        <div className="flex items-center gap-1.5">
-                            {Array.from({
-                                length: Math.min(5, Math.ceil(products.length / (typeof window !== 'undefined' && window.innerWidth < 640 ? 2 : 2))),
-                            }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => {
-                                        const slider = document.getElementById('product-slider');
-                                        if (slider) {
-                                            const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 2;
-                                            slider.scrollTo({ left: i * cardWidth * 2, behavior: 'smooth' });
-                                        }
-                                    }}
-                                    className={`h-2 w-2 rounded-full transition-colors ${
-                                        i === productActivePage ? 'bg-(--theme-primary-1)' : 'bg-gray-300 hover:bg-gray-400'
-                                    }`}
-                                    aria-label={`Go to products page ${i + 1}`}
-                                />
-                            ))}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('product-slider');
-                                if (slider) {
-                                    const cardWidth = window.innerWidth < 640 ? slider.offsetWidth / 2 : slider.offsetWidth / 2;
-                                    slider.scrollBy({ left: cardWidth, behavior: 'smooth' });
-                                }
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
-                            aria-label="Next products"
-                        >
-                            <ChevronRight className="h-5 w-5" />
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            {/* Why Choose Us – Auto-scrolling Slider with Consistent Pattern */}
-            <section className="bg-linear-to-b from-white via-gray-50/50 to-white py-10 sm:py-12 lg:py-14" aria-labelledby="why-choose-heading">
-                <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Centered Header with Icon */}
-                    <div className="mb-6 flex flex-col items-center justify-center sm:mb-5">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
-                                <svg
-                                    className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="text-center">
-                                <h2 id="why-choose-heading" className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">
-                                    Why Choose Us
-                                </h2>
-                                <p className="text-xs text-gray-400 sm:text-sm">Building trust through quality</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Auto-scrolling Why Choose Us Slider */}
-                    <div className="relative overflow-hidden py-4">
-                        <style>{`
+                        {/* Auto-scrolling Why Choose Us Slider */}
+                        <div className="relative overflow-hidden py-4">
+                            <style>{`
                                 @keyframes scroll-why-choose {
                                     0% { transform: translateX(0); }
                                     100% { transform: translateX(-50%); }
@@ -1042,838 +399,853 @@ export default function Home({ banners, categories, products = [], subscriptionP
                                     animation-play-state: paused;
                                 }
                             `}</style>
-                        <div className="why-choose-scroll flex gap-3 sm:gap-4 lg:gap-4">
-                            {/* Duplicate items for seamless loop */}
-                            {[
-                                ...[
-                                    { title: 'Sourced from local Kerala farms', image: '/images/why-choose-us/Sourced from local Kerala farms.png' },
-                                    { title: 'No preservatives', image: '/images/why-choose-us/no-preservatives.png' },
-                                    { title: 'Hygienic processing', image: '/images/why-choose-us/Hygienic processing.png' },
-                                    { title: 'Morning delivery before 7 AM', image: '/images/why-choose-us/morning-delivery.png' },
-                                    { title: 'Cancel / pause anytime', image: '/images/why-choose-us/Cancel-pause anytime.png' },
-                                    { title: 'Quality checked daily', image: '/images/why-choose-us/Quality checked daily.png' },
-                                    { title: 'Cold-chain maintained', image: '/images/why-choose-us/Cold-chain maintained.png' },
-                                    { title: 'Transparent pricing', image: '/images/why-choose-us/transparent-pricing.png' },
-                                ],
-                                ...[
-                                    { title: 'Sourced from local Kerala farms', image: '/images/why-choose-us/Sourced from local Kerala farms.png' },
-                                    { title: 'No preservatives', image: '/images/why-choose-us/no-preservatives.png' },
-                                    { title: 'Hygienic processing', image: '/images/why-choose-us/Hygienic processing.png' },
-                                    { title: 'Morning delivery before 7 AM', image: '/images/why-choose-us/morning-delivery.png' },
-                                    { title: 'Cancel / pause anytime', image: '/images/why-choose-us/Cancel-pause anytime.png' },
-                                    { title: 'Quality checked daily', image: '/images/why-choose-us/Quality checked daily.png' },
-                                    { title: 'Cold-chain maintained', image: '/images/why-choose-us/Cold-chain maintained.png' },
-                                    { title: 'Transparent pricing', image: '/images/why-choose-us/transparent-pricing.png' },
-                                ],
-                            ].map((item, index) => (
-                                <div
-                                    key={`${item.title}-${index}`}
-                                    className="group flex w-[calc(33.333%-8px)] shrink-0 flex-col items-center sm:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]"
-                                >
-                                    {/* Icon container - larger, no bg */}
-                                    <div className="relative mb-2 flex h-16 w-16 items-center justify-center overflow-hidden transition-all duration-300 group-hover:scale-105 sm:h-20 sm:w-20">
-                                        <img
-                                            src={item.image}
-                                            alt={item.title}
-                                            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110"
-                                            loading="lazy"
-                                        />
+                            <div className="why-choose-scroll flex gap-3 sm:gap-4 lg:gap-4">
+                                {/* Duplicate items for seamless loop */}
+                                {[
+                                    ...[
+                                        {
+                                            title: 'Sourced from local Kerala farms',
+                                            image: '/images/why-choose-us/Sourced from local Kerala farms.png',
+                                        },
+                                        { title: 'No preservatives', image: '/images/why-choose-us/no-preservatives.png' },
+                                        { title: 'Hygienic processing', image: '/images/why-choose-us/Hygienic processing.png' },
+                                        { title: 'Morning delivery before 7 AM', image: '/images/why-choose-us/morning-delivery.png' },
+                                        { title: 'Cancel / pause anytime', image: '/images/why-choose-us/Cancel-pause anytime.png' },
+                                        { title: 'Quality checked daily', image: '/images/why-choose-us/Quality checked daily.png' },
+                                        { title: 'Cold-chain maintained', image: '/images/why-choose-us/Cold-chain maintained.png' },
+                                        { title: 'Transparent pricing', image: '/images/why-choose-us/transparent-pricing.png' },
+                                    ],
+                                    ...[
+                                        {
+                                            title: 'Sourced from local Kerala farms',
+                                            image: '/images/why-choose-us/Sourced from local Kerala farms.png',
+                                        },
+                                        { title: 'No preservatives', image: '/images/why-choose-us/no-preservatives.png' },
+                                        { title: 'Hygienic processing', image: '/images/why-choose-us/Hygienic processing.png' },
+                                        { title: 'Morning delivery before 7 AM', image: '/images/why-choose-us/morning-delivery.png' },
+                                        { title: 'Cancel / pause anytime', image: '/images/why-choose-us/Cancel-pause anytime.png' },
+                                        { title: 'Quality checked daily', image: '/images/why-choose-us/Quality checked daily.png' },
+                                        { title: 'Cold-chain maintained', image: '/images/why-choose-us/Cold-chain maintained.png' },
+                                        { title: 'Transparent pricing', image: '/images/why-choose-us/transparent-pricing.png' },
+                                    ],
+                                ].map((item, index) => (
+                                    <div
+                                        key={`${item.title}-${index}`}
+                                        className="group flex w-[calc(33.333%-8px)] shrink-0 flex-col items-center sm:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]"
+                                    >
+                                        {/* Icon container - larger, no bg */}
+                                        <div className="relative mb-2 flex h-16 w-16 items-center justify-center overflow-hidden transition-all duration-300 group-hover:scale-105 sm:h-20 sm:w-20">
+                                            <img
+                                                src={item.image}
+                                                alt={item.title}
+                                                className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110"
+                                                loading="lazy"
+                                            />
+                                        </div>
+
+                                        {/* Title - centered, compact */}
+                                        <h3 className="text-center text-[10px] leading-tight font-semibold text-gray-700 transition-colors duration-200 group-hover:text-(--theme-primary-1) sm:text-xs">
+                                            {item.title}
+                                        </h3>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Morning Delivery Promise – Modern Compact Design */}
+                <section className="relative overflow-hidden bg-(--theme-primary-1) py-8 sm:py-10 lg:py-12">
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 opacity-10" aria-hidden>
+                        <div className="absolute -top-20 -right-20 h-72 w-72 rounded-full bg-white/20 blur-3xl sm:h-96 sm:w-96" />
+                        <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/20 blur-3xl sm:h-96 sm:w-96" />
+                    </div>
+
+                    <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
+                        {/* Main Content Card */}
+                        <div className="overflow-hidden rounded-xl bg-white shadow-xl lg:rounded-2xl">
+                            <div className="flex flex-col lg:flex-row">
+                                {/* Left: Content */}
+                                <div className="flex-1 p-5 sm:p-6 lg:p-8">
+                                    {/* Badge */}
+                                    <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-(--theme-primary-1)/10 px-2.5 py-1 text-[10px] font-semibold text-(--theme-primary-1) sm:text-xs">
+                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Morning Delivery
+                                    </span>
+
+                                    {/* Heading */}
+                                    <h2 className="mb-3 text-xl leading-tight font-bold text-gray-900 sm:text-2xl lg:text-3xl">
+                                        Wake Up to <span className="text-(--theme-primary-1)">Freshness</span> Every Day
+                                    </h2>
+
+                                    {/* Description */}
+                                    <p className="mb-4 text-xs leading-relaxed text-gray-600 sm:text-sm">
+                                        Milk delivered before your day starts—no store visits, no forgetting. Start your morning with the freshest
+                                        dairy products right at your doorstep.
+                                    </p>
+
+                                    {/* Feature Grid */}
+                                    <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3">
+                                        {[
+                                            { text: 'Before 7 AM', icon: 'clock', desc: 'Daily delivery' },
+                                            { text: 'No store visits', icon: 'home', desc: 'Doorstep service' },
+                                            { text: 'Never miss milk', icon: 'check', desc: 'Reliable supply' },
+                                            { text: 'Farm to door', icon: 'truck', desc: 'Fresh & pure' },
+                                        ].map((point) => (
+                                            <div
+                                                key={point.text}
+                                                className="group rounded-lg bg-gray-50 p-2.5 transition-all hover:bg-(--theme-primary-1)/5 hover:shadow-md sm:p-3"
+                                            >
+                                                <div className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-md bg-(--theme-primary-1) text-white shadow-sm transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
+                                                    {point.icon === 'clock' && (
+                                                        <svg
+                                                            className="h-4 w-4 sm:h-5 sm:w-5"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                            strokeWidth={2}
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                    {point.icon === 'home' && (
+                                                        <svg
+                                                            className="h-4 w-4 sm:h-5 sm:w-5"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                            strokeWidth={2}
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                    {point.icon === 'check' && (
+                                                        <svg
+                                                            className="h-4 w-4 sm:h-5 sm:w-5"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                            strokeWidth={2}
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                    {point.icon === 'truck' && (
+                                                        <svg
+                                                            className="h-4 w-4 sm:h-5 sm:w-5"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                            strokeWidth={2}
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                                <h4 className="text-xs font-bold text-gray-800 sm:text-sm">{point.text}</h4>
+                                                <p className="text-[10px] text-gray-500 sm:text-xs">{point.desc}</p>
+                                            </div>
+                                        ))}
                                     </div>
 
-                                    {/* Title - centered, compact */}
-                                    <h3 className="text-center text-[10px] leading-tight font-semibold text-gray-700 transition-colors duration-200 group-hover:text-(--theme-primary-1) sm:text-xs">
-                                        {item.title}
-                                    </h3>
+                                    {/* CTA Buttons */}
+                                    <div className="flex flex-wrap gap-2.5 sm:gap-3">
+                                        <a
+                                            href="/login"
+                                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-(--theme-primary-1) px-4 py-2.5 text-xs font-bold text-white shadow-(--theme-primary-1)/30 shadow-md transition-all hover:-translate-y-0.5 hover:bg-(--theme-primary-1-dark) hover:shadow-lg active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
+                                        >
+                                            Subscribe Now
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                            </svg>
+                                        </a>
+                                        <a
+                                            href="#"
+                                            className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 transition-all hover:border-(--theme-primary-1) hover:text-(--theme-primary-1) active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
+                                        >
+                                            Check delivery area
+                                        </a>
+                                    </div>
                                 </div>
+
+                                {/* Right: Video */}
+                                <div className="relative aspect-video w-full lg:aspect-auto lg:w-[42%]">
+                                    <video
+                                        src="/video/fresh-milk.mp4"
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                        preload="auto"
+                                        className="h-full w-full object-cover"
+                                        aria-label="Fresh milk delivery"
+                                    />
+                                    <div
+                                        className="absolute inset-0 bg-linear-to-r from-white/20 via-transparent to-transparent lg:from-white/30"
+                                        aria-hidden
+                                    />
+
+                                    {/* Floating Stats Card */}
+                                    <div className="absolute bottom-3 left-3 rounded-lg bg-white/95 p-2 shadow-lg backdrop-blur-sm sm:bottom-4 sm:left-4 sm:p-3 lg:bottom-6 lg:left-6">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1)/10 text-(--theme-primary-1) sm:h-10 sm:w-10">
+                                                <svg
+                                                    className="h-4 w-4 sm:h-5 sm:w-5"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-gray-500 sm:text-xs">Delivery Success</p>
+                                                <p className="text-base font-bold text-gray-900 sm:text-lg">99.8%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Our Stories – Slider with Navigation (Same layout as Categories/Products) */}
+                <section className="bg-(--theme-primary-1) py-10 sm:py-12 lg:py-14" aria-labelledby="our-stories-heading">
+                    <div className="container mx-auto px-3 sm:px-4 lg:px-6">
+                        {/* Compact Header with Icon and Nav Buttons */}
+                        <div className="mb-6 flex items-center justify-between sm:mb-5">
+                            <div className="flex items-center gap-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 sm:h-9 sm:w-9">
+                                    <Play className="h-4 w-4 text-white sm:h-5 sm:w-5" fill="currentColor" />
+                                </div>
+                                <div>
+                                    <h2 id="our-stories-heading" className="text-lg font-bold text-white sm:text-xl">
+                                        Our Stories
+                                    </h2>
+                                    <p className="text-xs text-white/70 sm:text-sm">Freshtick Shorts — fresh updates</p>
+                                </div>
+                            </div>
+
+                            {/* Web: Nav buttons near View All */}
+                            <div className="hidden items-center gap-2 lg:flex">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const slider = document.getElementById('stories-slider');
+                                        if (slider) slider.scrollBy({ left: -slider.offsetWidth / 6, behavior: 'smooth' });
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90 hover:shadow-lg"
+                                    aria-label="Previous stories"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const slider = document.getElementById('stories-slider');
+                                        if (slider) slider.scrollBy({ left: slider.offsetWidth / 6, behavior: 'smooth' });
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90 hover:shadow-lg"
+                                    aria-label="Next stories"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Stories Slider */}
+                        <div
+                            ref={storiesSliderRef}
+                            id="stories-slider"
+                            className="scrollbar-hide mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-4 lg:mb-0"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            onScroll={() => {
+                                const slider = storiesSliderRef.current;
+                                if (slider) {
+                                    const scrollLeft = slider.scrollLeft;
+                                    const maxScroll = slider.scrollWidth - slider.clientWidth;
+                                    const pageCount = Math.ceil(STORIES.length / (window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 3 : 6));
+                                    const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
+                                    setStoriesActivePage(Math.min(currentPage, pageCount - 1));
+                                }
+                            }}
+                        >
+                            {STORIES.map((story, index) => (
+                                <button
+                                    key={story.id}
+                                    type="button"
+                                    onClick={() => setStoryViewerIndex(index)}
+                                    className="group flex w-[calc(33.333%-8px)] shrink-0 snap-start flex-col rounded-xl text-left focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-(--theme-primary-1) focus:outline-none sm:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]"
+                                    aria-label={`Watch short: ${story.label}`}
+                                >
+                                    {/* Short video preview – vertical 9:16 */}
+                                    <div className="relative w-full overflow-hidden rounded-lg bg-gray-200">
+                                        <div className="aspect-9/16 w-full">
+                                            <video
+                                                src={story.src}
+                                                className="h-full w-full object-cover"
+                                                muted
+                                                loop
+                                                playsInline
+                                                preload="metadata"
+                                                aria-hidden
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity group-hover:bg-black/30">
+                                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md sm:h-12 sm:w-12">
+                                                    <Play
+                                                        className="h-5 w-5 text-(--theme-primary-1) sm:h-6 sm:w-6"
+                                                        strokeWidth={2}
+                                                        fill="currentColor"
+                                                    />
+                                                </span>
+                                            </div>
+                                            <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur sm:text-xs">
+                                                {story.views} views
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* User / channel details */}
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="flex h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white/20 ring-1 ring-white/40">
+                                            <img src="/images/logo_light.png" alt="" className="h-full w-full object-contain p-0.5" />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-xs font-semibold text-white sm:text-sm">Freshtick</p>
+                                            <p className="truncate text-[10px] text-white/80 sm:text-xs">{story.label}</p>
+                                        </div>
+                                    </div>
+                                </button>
                             ))}
                         </div>
-                    </div>
-                </div>
-            </section>
 
-            {/* Morning Delivery Promise – Modern Compact Design */}
-            <section className="relative overflow-hidden bg-(--theme-primary-1) py-8 sm:py-10 lg:py-12">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10" aria-hidden>
-                    <div className="absolute -top-20 -right-20 h-72 w-72 rounded-full bg-white/20 blur-3xl sm:h-96 sm:w-96" />
-                    <div className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-white/20 blur-3xl sm:h-96 sm:w-96" />
-                </div>
-
-                <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Main Content Card */}
-                    <div className="overflow-hidden rounded-xl bg-white shadow-xl lg:rounded-2xl">
-                        <div className="flex flex-col lg:flex-row">
-                            {/* Left: Content */}
-                            <div className="flex-1 p-5 sm:p-6 lg:p-8">
-                                {/* Badge */}
-                                <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-(--theme-primary-1)/10 px-2.5 py-1 text-[10px] font-semibold text-(--theme-primary-1) sm:text-xs">
-                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Morning Delivery
-                                </span>
-
-                                {/* Heading */}
-                                <h2 className="mb-3 text-xl leading-tight font-bold text-gray-900 sm:text-2xl lg:text-3xl">
-                                    Wake Up to <span className="text-(--theme-primary-1)">Freshness</span> Every Day
-                                </h2>
-
-                                {/* Description */}
-                                <p className="mb-4 text-xs leading-relaxed text-gray-600 sm:text-sm">
-                                    Milk delivered before your day starts—no store visits, no forgetting. Start your morning with the freshest dairy
-                                    products right at your doorstep.
-                                </p>
-
-                                {/* Feature Grid */}
-                                <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3">
-                                    {[
-                                        { text: 'Before 7 AM', icon: 'clock', desc: 'Daily delivery' },
-                                        { text: 'No store visits', icon: 'home', desc: 'Doorstep service' },
-                                        { text: 'Never miss milk', icon: 'check', desc: 'Reliable supply' },
-                                        { text: 'Farm to door', icon: 'truck', desc: 'Fresh & pure' },
-                                    ].map((point) => (
-                                        <div
-                                            key={point.text}
-                                            className="group rounded-lg bg-gray-50 p-2.5 transition-all hover:bg-(--theme-primary-1)/5 hover:shadow-md sm:p-3"
-                                        >
-                                            <div className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-md bg-(--theme-primary-1) text-white shadow-sm transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
-                                                {point.icon === 'clock' && (
-                                                    <svg
-                                                        className="h-4 w-4 sm:h-5 sm:w-5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                        />
-                                                    </svg>
-                                                )}
-                                                {point.icon === 'home' && (
-                                                    <svg
-                                                        className="h-4 w-4 sm:h-5 sm:w-5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                                                        />
-                                                    </svg>
-                                                )}
-                                                {point.icon === 'check' && (
-                                                    <svg
-                                                        className="h-4 w-4 sm:h-5 sm:w-5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                        />
-                                                    </svg>
-                                                )}
-                                                {point.icon === 'truck' && (
-                                                    <svg
-                                                        className="h-4 w-4 sm:h-5 sm:w-5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-                                                        />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <h4 className="text-xs font-bold text-gray-800 sm:text-sm">{point.text}</h4>
-                                            <p className="text-[10px] text-gray-500 sm:text-xs">{point.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* CTA Buttons */}
-                                <div className="flex flex-wrap gap-2.5 sm:gap-3">
-                                    <a
-                                        href="/login"
-                                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-(--theme-primary-1) px-4 py-2.5 text-xs font-bold text-white shadow-(--theme-primary-1)/30 shadow-md transition-all hover:-translate-y-0.5 hover:bg-(--theme-primary-1-dark) hover:shadow-lg active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
-                                    >
-                                        Subscribe Now
-                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                        </svg>
-                                    </a>
-                                    <a
-                                        href="#"
-                                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 transition-all hover:border-(--theme-primary-1) hover:text-(--theme-primary-1) active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
-                                    >
-                                        Check delivery area
-                                    </a>
-                                </div>
-                            </div>
-
-                            {/* Right: Video */}
-                            <div className="relative aspect-video w-full lg:aspect-auto lg:w-[42%]">
-                                <video
-                                    src="/video/fresh-milk.mp4"
-                                    autoPlay
-                                    muted
-                                    loop
-                                    playsInline
-                                    preload="auto"
-                                    className="h-full w-full object-cover"
-                                    aria-label="Fresh milk delivery"
-                                />
-                                <div
-                                    className="absolute inset-0 bg-linear-to-r from-white/20 via-transparent to-transparent lg:from-white/30"
-                                    aria-hidden
-                                />
-
-                                {/* Floating Stats Card */}
-                                <div className="absolute bottom-3 left-3 rounded-lg bg-white/95 p-2 shadow-lg backdrop-blur-sm sm:bottom-4 sm:left-4 sm:p-3 lg:bottom-6 lg:left-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1)/10 text-(--theme-primary-1) sm:h-10 sm:w-10">
-                                            <svg
-                                                className="h-4 w-4 sm:h-5 sm:w-5"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                                strokeWidth={2}
-                                            >
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 sm:text-xs">Delivery Success</p>
-                                            <p className="text-base font-bold text-gray-900 sm:text-lg">99.8%</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Our Stories – Slider with Navigation (Same layout as Categories/Products) */}
-            <section className="bg-(--theme-primary-1) py-10 sm:py-12 lg:py-14" aria-labelledby="our-stories-heading">
-                <div className="container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Compact Header with Icon and Nav Buttons */}
-                    <div className="mb-6 flex items-center justify-between sm:mb-5">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 sm:h-9 sm:w-9">
-                                <Play className="h-4 w-4 text-white sm:h-5 sm:w-5" fill="currentColor" />
-                            </div>
-                            <div>
-                                <h2 id="our-stories-heading" className="text-lg font-bold text-white sm:text-xl">
-                                    Our Stories
-                                </h2>
-                                <p className="text-xs text-white/70 sm:text-sm">Freshtick Shorts — fresh updates</p>
-                            </div>
-                        </div>
-
-                        {/* Web: Nav buttons near View All */}
-                        <div className="hidden items-center gap-2 lg:flex">
+                        {/* Mobile: Bottom nav with pagination */}
+                        <div className="flex items-center justify-center gap-4 lg:hidden">
                             <button
                                 type="button"
                                 onClick={() => {
                                     const slider = document.getElementById('stories-slider');
-                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 6, behavior: 'smooth' });
+                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 2, behavior: 'smooth' });
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90 hover:shadow-lg"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90"
                                 aria-label="Previous stories"
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </button>
+
+                            {/* Pagination dots */}
+                            <div className="flex items-center gap-1.5">
+                                {[...Array(Math.min(5, Math.ceil(STORIES.length / 2)))].map((_, i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => {
+                                            const slider = document.getElementById('stories-slider');
+                                            if (slider) slider.scrollTo({ left: i * slider.offsetWidth, behavior: 'smooth' });
+                                        }}
+                                        className={`h-2 w-2 rounded-full transition-all ${
+                                            i === storiesActivePage ? 'bg-white' : 'bg-white/40 hover:bg-white/60'
+                                        }`}
+                                        aria-label={`Go to stories page ${i + 1}`}
+                                    />
+                                ))}
+                            </div>
+
                             <button
                                 type="button"
                                 onClick={() => {
                                     const slider = document.getElementById('stories-slider');
-                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 6, behavior: 'smooth' });
+                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 2, behavior: 'smooth' });
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90 hover:shadow-lg"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90"
                                 aria-label="Next stories"
                             >
                                 <ChevronRight className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
+                </section>
 
-                    {/* Stories Slider */}
+                {/* Story viewer fullscreen overlay – video fills viewport, close above tap zones */}
+                {storyViewerIndex !== null && (
                     <div
-                        ref={storiesSliderRef}
-                        id="stories-slider"
-                        className="scrollbar-hide mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-4 lg:mb-0"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        onScroll={() => {
-                            const slider = storiesSliderRef.current;
-                            if (slider) {
-                                const scrollLeft = slider.scrollLeft;
-                                const maxScroll = slider.scrollWidth - slider.clientWidth;
-                                const pageCount = Math.ceil(STORIES.length / (window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 3 : 6));
-                                const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
-                                setStoriesActivePage(Math.min(currentPage, pageCount - 1));
-                            }
-                        }}
+                        className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-black"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Story viewer"
                     >
-                        {STORIES.map((story, index) => (
+                        {/* Video – fills entire viewport */}
+                        <div className="absolute inset-0">
+                            <video
+                                ref={storyVideoRef}
+                                src={STORIES[storyViewerIndex].src}
+                                className="h-full w-full object-contain"
+                                playsInline
+                                muted={false}
+                            />
+                        </div>
+                        {/* Progress bars – above video, above tap zones so close is clickable */}
+                        <div className="absolute top-0 right-0 left-0 z-20 flex gap-1 px-2 pt-3 sm:gap-1.5 sm:px-3 sm:pt-4">
+                            {STORIES.map((_, i) => (
+                                <div key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+                                    <div
+                                        className="h-full rounded-full bg-white transition-[width] duration-75"
+                                        style={{ width: i < storyViewerIndex ? '100%' : i === storyViewerIndex ? `${storyProgress}%` : '0%' }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        {/* Brand + close – z-20 so button is clickable (above tap zones) */}
+                        <div className="absolute top-10 right-0 left-0 z-20 flex items-center justify-between px-4 sm:top-12 sm:px-6">
+                            <span className="text-sm font-semibold text-white/90">Freshtick</span>
                             <button
-                                key={story.id}
                                 type="button"
-                                onClick={() => setStoryViewerIndex(index)}
-                                className="group flex w-[calc(33.333%-8px)] shrink-0 snap-start flex-col rounded-xl text-left focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-(--theme-primary-1) focus:outline-none sm:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]"
-                                aria-label={`Watch short: ${story.label}`}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setStoryViewerIndex(null);
+                                }}
+                                className="relative z-20 rounded-full p-2 text-white/90 transition-colors hover:bg-white/20 hover:text-white focus:ring-2 focus:ring-white/50 focus:outline-none"
+                                aria-label="Close story"
                             >
-                                {/* Short video preview – vertical 9:16 */}
-                                <div className="relative w-full overflow-hidden rounded-lg bg-gray-200">
-                                    <div className="aspect-9/16 w-full">
-                                        <video
-                                            src={story.src}
-                                            className="h-full w-full object-cover"
-                                            muted
-                                            loop
-                                            playsInline
-                                            preload="metadata"
-                                            aria-hidden
-                                        />
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity group-hover:bg-black/30">
-                                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md sm:h-12 sm:w-12">
-                                                <Play
-                                                    className="h-5 w-5 text-(--theme-primary-1) sm:h-6 sm:w-6"
-                                                    strokeWidth={2}
-                                                    fill="currentColor"
-                                                />
-                                            </span>
-                                        </div>
-                                        <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur sm:text-xs">
-                                            {story.views} views
-                                        </span>
-                                    </div>
-                                </div>
-                                {/* User / channel details */}
-                                <div className="mt-2 flex items-center gap-2">
-                                    <span className="flex h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white/20 ring-1 ring-white/40">
-                                        <img src="/images/logo_light.png" alt="" className="h-full w-full object-contain p-0.5" />
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-xs font-semibold text-white sm:text-sm">Freshtick</p>
-                                        <p className="truncate text-[10px] text-white/80 sm:text-xs">{story.label}</p>
-                                    </div>
-                                </div>
+                                <X className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={2} />
                             </button>
-                        ))}
+                        </div>
+                        {/* Tap zones: left = prev, right = next (z-10, below header so close works) */}
+                        <div className="absolute inset-0 z-10 flex">
+                            <button
+                                type="button"
+                                className="w-2/5 shrink-0 focus:outline-none"
+                                onClick={() => setStoryViewerIndex(storyViewerIndex > 0 ? storyViewerIndex - 1 : null)}
+                                aria-label="Previous story"
+                            />
+                            <button
+                                type="button"
+                                className="flex-1 focus:outline-none"
+                                onClick={() => setStoryViewerIndex(storyViewerIndex < STORIES.length - 1 ? storyViewerIndex + 1 : null)}
+                                aria-label="Next story"
+                            />
+                        </div>
                     </div>
+                )}
 
-                    {/* Mobile: Bottom nav with pagination */}
-                    <div className="flex items-center justify-center gap-4 lg:hidden">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('stories-slider');
-                                if (slider) slider.scrollBy({ left: -slider.offsetWidth / 2, behavior: 'smooth' });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90"
-                            aria-label="Previous stories"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </button>
+                {/* Subscription Plans – white cards, 480ml/1L tabs, primary outline */}
+                <section id="subscriptions" className="bg-white py-12 sm:py-16 lg:py-20">
+                    <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                        <h2 className="mb-6 text-center text-2xl font-bold text-gray-900 sm:text-3xl lg:text-4xl">Subscription Plans</h2>
 
-                        {/* Pagination dots */}
-                        <div className="flex items-center gap-1.5">
-                            {[...Array(Math.min(5, Math.ceil(STORIES.length / 2)))].map((_, i) => (
+                        {/* Variant tabs */}
+                        <div className="mb-8 flex justify-center gap-2">
+                            {availableVariants.map((v) => (
                                 <button
-                                    key={i}
+                                    key={v}
                                     type="button"
-                                    onClick={() => {
-                                        const slider = document.getElementById('stories-slider');
-                                        if (slider) slider.scrollTo({ left: i * slider.offsetWidth, behavior: 'smooth' });
-                                    }}
-                                    className={`h-2 w-2 rounded-full transition-all ${
-                                        i === storiesActivePage ? 'bg-white' : 'bg-white/40 hover:bg-white/60'
+                                    onClick={() => handleSubVariantChange(v as '480ml' | '1L')}
+                                    className={`rounded-lg border-2 px-5 py-2.5 text-sm font-semibold transition-all sm:px-6 sm:py-3 sm:text-base ${
+                                        subVariantSearch === v
+                                            ? 'border-(--theme-primary-1) bg-(--theme-primary-1) text-white'
+                                            : 'border-gray-300 bg-white text-gray-700 hover:border-(--theme-primary-1) hover:text-(--theme-primary-1)'
                                     }`}
-                                    aria-label={`Go to stories page ${i + 1}`}
-                                />
+                                >
+                                    {v}
+                                </button>
                             ))}
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('stories-slider');
-                                if (slider) slider.scrollBy({ left: slider.offsetWidth / 2, behavior: 'smooth' });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-(--theme-primary-1) shadow-md transition-all hover:bg-white/90"
-                            aria-label="Next stories"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            {/* Story viewer fullscreen overlay – video fills viewport, close above tap zones */}
-            {storyViewerIndex !== null && (
-                <div
-                    className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-black"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Story viewer"
-                >
-                    {/* Video – fills entire viewport */}
-                    <div className="absolute inset-0">
-                        <video
-                            ref={storyVideoRef}
-                            src={STORIES[storyViewerIndex].src}
-                            className="h-full w-full object-contain"
-                            playsInline
-                            muted={false}
-                        />
-                    </div>
-                    {/* Progress bars – above video, above tap zones so close is clickable */}
-                    <div className="absolute top-0 right-0 left-0 z-20 flex gap-1 px-2 pt-3 sm:gap-1.5 sm:px-3 sm:pt-4">
-                        {STORIES.map((_, i) => (
-                            <div key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
-                                <div
-                                    className="h-full rounded-full bg-white transition-[width] duration-75"
-                                    style={{ width: i < storyViewerIndex ? '100%' : i === storyViewerIndex ? `${storyProgress}%` : '0%' }}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                    {/* Brand + close – z-20 so button is clickable (above tap zones) */}
-                    <div className="absolute top-10 right-0 left-0 z-20 flex items-center justify-between px-4 sm:top-12 sm:px-6">
-                        <span className="text-sm font-semibold text-white/90">Freshtick</span>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setStoryViewerIndex(null);
-                            }}
-                            className="relative z-20 rounded-full p-2 text-white/90 transition-colors hover:bg-white/20 hover:text-white focus:ring-2 focus:ring-white/50 focus:outline-none"
-                            aria-label="Close story"
-                        >
-                            <X className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={2} />
-                        </button>
-                    </div>
-                    {/* Tap zones: left = prev, right = next (z-10, below header so close works) */}
-                    <div className="absolute inset-0 z-10 flex">
-                        <button
-                            type="button"
-                            className="w-2/5 shrink-0 focus:outline-none"
-                            onClick={() => setStoryViewerIndex(storyViewerIndex > 0 ? storyViewerIndex - 1 : null)}
-                            aria-label="Previous story"
-                        />
-                        <button
-                            type="button"
-                            className="flex-1 focus:outline-none"
-                            onClick={() => setStoryViewerIndex(storyViewerIndex < STORIES.length - 1 ? storyViewerIndex + 1 : null)}
-                            aria-label="Next story"
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Subscription Plans – white cards, 480ml/1L tabs, primary outline */}
-            <section id="subscriptions" className="bg-white py-12 sm:py-16 lg:py-20">
-                <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <h2 className="mb-6 text-center text-2xl font-bold text-gray-900 sm:text-3xl lg:text-4xl">Subscription Plans</h2>
-
-                    {/* Variant tabs */}
-                    <div className="mb-8 flex justify-center gap-2">
-                        {availableVariants.map((v) => (
-                            <button
-                                key={v}
-                                type="button"
-                                onClick={() => handleSubVariantChange(v as '480ml' | '1L')}
-                                className={`rounded-lg border-2 px-5 py-2.5 text-sm font-semibold transition-all sm:px-6 sm:py-3 sm:text-base ${
-                                    subVariantSearch === v
-                                        ? 'border-(--theme-primary-1) bg-(--theme-primary-1) text-white'
-                                        : 'border-gray-300 bg-white text-gray-700 hover:border-(--theme-primary-1) hover:text-(--theme-primary-1)'
-                                }`}
-                            >
-                                {v}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="grid gap-5 sm:grid-cols-3 sm:gap-6">
-                        {subscriptionPlans.map((plan) => {
-                            const item = getPlanItem(plan);
-                            return (
-                                <div
-                                    key={plan.id}
-                                    className="flex flex-col rounded-xl border-2 border-(--theme-primary-1) bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:p-6"
-                                >
-                                    <div className="mb-3 flex items-start justify-between gap-2">
-                                        <h3 className="text-lg font-bold text-gray-900 sm:text-xl">{plan.name}</h3>
-                                        {plan.discount_type !== 'none' && plan.discount_value > 0 && (
-                                            <span className="shrink-0 rounded bg-(--theme-primary-1) px-2 py-0.5 text-xs font-bold text-white">
-                                                {plan.discount_type === 'percentage'
-                                                    ? `${Math.round(plan.discount_value)}% OFF`
-                                                    : `₹${Math.round(plan.discount_value)} OFF`}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {item && (
-                                        <>
-                                            <p className="mb-2 text-sm text-gray-600">{item.product_name}</p>
-                                            <p className="mb-2 text-sm text-gray-600">{item.units} Unit(s)</p>
-                                            <p className="mb-1 text-xl font-bold text-(--theme-primary-1) sm:text-2xl">
-                                                ₹{Math.round(item.total_price)}
-                                            </p>
-                                            <p className="mb-3 text-sm font-medium text-gray-700">₹{Math.round(item.per_unit_price)}/Unit(s)</p>
-                                        </>
-                                    )}
-                                    <ul className="mb-4 space-y-1.5 border-t border-gray-100 pt-3" role="list">
-                                        {plan.features.map((feature) => (
-                                            <li key={feature.id} className="flex items-center gap-2 text-sm text-gray-700">
-                                                <span
-                                                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${feature.highlight ? 'bg-(--theme-secondary) text-(--theme-primary-1)' : 'bg-gray-100 text-gray-500'}`}
-                                                >
-                                                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                </span>
-                                                <span>{feature.title}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <Link
-                                        href={`/subscription?plan=${plan.id}`}
-                                        className="mt-auto rounded-lg bg-(--theme-primary-1) px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-(--theme-primary-1-dark) sm:py-3 sm:text-base"
+                        <div className="grid gap-5 sm:grid-cols-3 sm:gap-6">
+                            {subscriptionPlans.map((plan) => {
+                                const item = getPlanItem(plan);
+                                return (
+                                    <div
+                                        key={plan.id}
+                                        className="flex flex-col rounded-xl border-2 border-(--theme-primary-1) bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:p-6"
                                     >
-                                        Subscribe
-                                    </Link>
-                                </div>
-                            );
-                        })}
+                                        <div className="mb-3 flex items-start justify-between gap-2">
+                                            <h3 className="text-lg font-bold text-gray-900 sm:text-xl">{plan.name}</h3>
+                                            {plan.discount_type !== 'none' && plan.discount_value > 0 && (
+                                                <span className="shrink-0 rounded bg-(--theme-primary-1) px-2 py-0.5 text-xs font-bold text-white">
+                                                    {plan.discount_type === 'percentage'
+                                                        ? `${Math.round(plan.discount_value)}% OFF`
+                                                        : `₹${Math.round(plan.discount_value)} OFF`}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {item && (
+                                            <>
+                                                <p className="mb-2 text-sm text-gray-600">{item.product_name}</p>
+                                                <p className="mb-2 text-sm text-gray-600">{item.units} Unit(s)</p>
+                                                <p className="mb-1 text-xl font-bold text-(--theme-primary-1) sm:text-2xl">
+                                                    ₹{Math.round(item.total_price)}
+                                                </p>
+                                                <p className="mb-3 text-sm font-medium text-gray-700">₹{Math.round(item.per_unit_price)}/Unit(s)</p>
+                                            </>
+                                        )}
+                                        <ul className="mb-4 space-y-1.5 border-t border-gray-100 pt-3" role="list">
+                                            {plan.features.map((feature) => (
+                                                <li key={feature.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <span
+                                                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${feature.highlight ? 'bg-(--theme-secondary) text-(--theme-primary-1)' : 'bg-gray-100 text-gray-500'}`}
+                                                    >
+                                                        <svg
+                                                            className="h-3 w-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                            strokeWidth={2.5}
+                                                        >
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </span>
+                                                    <span>{feature.title}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <Link
+                                            href={`/subscription?plan=${plan.id}`}
+                                            className="mt-auto rounded-lg bg-(--theme-primary-1) px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-(--theme-primary-1-dark) sm:py-3 sm:text-base"
+                                        >
+                                            Subscribe
+                                        </Link>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* Customer Testimonials – Slider with Navigation (Same layout as Categories/Products) */}
-            <section className="relative overflow-hidden bg-gray-50 py-10 sm:py-12 lg:py-14" aria-label="Customer testimonials">
-                <div className="section-icon-bg pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
-                    <img
-                        src="/images/icons/milk-bottle.png"
-                        alt=""
-                        className="absolute top-[8%] left-[2%] h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16"
-                        style={{ opacity: 0.06, transform: 'rotate(-15deg)' }}
-                    />
-                    <img
-                        src="/images/icons/farm.png"
-                        alt=""
-                        className="absolute top-[5%] right-[4%] h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
-                        style={{ opacity: 0.05, transform: 'rotate(10deg)' }}
-                    />
-                    <img
-                        src="/images/icons/animal.png"
-                        alt=""
-                        className="absolute bottom-[15%] left-[1%] h-10 w-10 sm:h-12 sm:w-12"
-                        style={{ opacity: 0.05, transform: 'rotate(8deg)' }}
-                    />
-                    <img
-                        src="/images/icons/milk-bottle%20(1).png"
-                        alt=""
-                        className="absolute right-[8%] bottom-[10%] h-12 w-12 sm:h-14 sm:w-14"
-                        style={{ opacity: 0.06, transform: 'rotate(-8deg)' }}
-                    />
-                    <img
-                        src="/images/icons/discount.png"
-                        alt=""
-                        className="absolute top-1/2 left-[15%] h-8 w-8 -translate-y-1/2 sm:h-10 sm:w-10"
-                        style={{ opacity: 0.04, transform: 'rotate(12deg)' }}
-                    />
-                    <img
-                        src="/images/icons/milk%20(1).png"
-                        alt=""
-                        className="absolute top-1/2 right-[18%] h-8 w-8 -translate-y-1/2 sm:h-10 sm:w-10"
-                        style={{ opacity: 0.05, transform: 'rotate(-6deg)' }}
-                    />
-                </div>
-                <div className="relative z-10 container mx-auto px-3 sm:px-4 lg:px-6">
-                    {/* Compact Header with Icon and Nav Buttons */}
-                    <div className="mb-6 flex items-center justify-between sm:mb-5">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
-                                <svg
-                                    className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                                    />
-                                </svg>
+                {/* Customer Testimonials – Slider with Navigation (Same layout as Categories/Products) */}
+                <section className="relative overflow-hidden bg-gray-50 py-10 sm:py-12 lg:py-14" aria-label="Customer testimonials">
+                    <div className="section-icon-bg pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+                        <img
+                            src="/images/icons/milk-bottle.png"
+                            alt=""
+                            className="absolute top-[8%] left-[2%] h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16"
+                            style={{ opacity: 0.06, transform: 'rotate(-15deg)' }}
+                        />
+                        <img
+                            src="/images/icons/farm.png"
+                            alt=""
+                            className="absolute top-[5%] right-[4%] h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
+                            style={{ opacity: 0.05, transform: 'rotate(10deg)' }}
+                        />
+                        <img
+                            src="/images/icons/animal.png"
+                            alt=""
+                            className="absolute bottom-[15%] left-[1%] h-10 w-10 sm:h-12 sm:w-12"
+                            style={{ opacity: 0.05, transform: 'rotate(8deg)' }}
+                        />
+                        <img
+                            src="/images/icons/milk-bottle%20(1).png"
+                            alt=""
+                            className="absolute right-[8%] bottom-[10%] h-12 w-12 sm:h-14 sm:w-14"
+                            style={{ opacity: 0.06, transform: 'rotate(-8deg)' }}
+                        />
+                        <img
+                            src="/images/icons/discount.png"
+                            alt=""
+                            className="absolute top-1/2 left-[15%] h-8 w-8 -translate-y-1/2 sm:h-10 sm:w-10"
+                            style={{ opacity: 0.04, transform: 'rotate(12deg)' }}
+                        />
+                        <img
+                            src="/images/icons/milk%20(1).png"
+                            alt=""
+                            className="absolute top-1/2 right-[18%] h-8 w-8 -translate-y-1/2 sm:h-10 sm:w-10"
+                            style={{ opacity: 0.05, transform: 'rotate(-6deg)' }}
+                        />
+                    </div>
+                    <div className="relative z-10 container mx-auto px-3 sm:px-4 lg:px-6">
+                        {/* Compact Header with Icon and Nav Buttons */}
+                        <div className="mb-6 flex items-center justify-between sm:mb-5">
+                            <div className="flex items-center gap-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--theme-primary-1)/10 sm:h-9 sm:w-9">
+                                    <svg
+                                        className="h-4 w-4 text-(--theme-primary-1) sm:h-5 sm:w-5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                                        />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">What Our Customers Say</h2>
+                                    <p className="text-xs text-gray-400 sm:text-sm">Real feedback from Kerala</p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold text-(--theme-primary-1-dark) sm:text-xl">What Our Customers Say</h2>
-                                <p className="text-xs text-gray-400 sm:text-sm">Real feedback from Kerala</p>
+
+                            {/* Web: Nav buttons near View All */}
+                            <div className="hidden items-center gap-2 lg:flex">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const slider = document.getElementById('testimonials-slider');
+                                        if (slider) slider.scrollBy({ left: -slider.offsetWidth / 3, behavior: 'smooth' });
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
+                                    aria-label="Previous testimonials"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const slider = document.getElementById('testimonials-slider');
+                                        if (slider) slider.scrollBy({ left: slider.offsetWidth / 3, behavior: 'smooth' });
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
+                                    aria-label="Next testimonials"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
                             </div>
                         </div>
 
-                        {/* Web: Nav buttons near View All */}
-                        <div className="hidden items-center gap-2 lg:flex">
+                        {/* Testimonials Slider */}
+                        <div
+                            ref={testimonialsSliderRef}
+                            id="testimonials-slider"
+                            className="scrollbar-hide mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-4 lg:mb-0"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            role="list"
+                            onScroll={() => {
+                                const slider = testimonialsSliderRef.current;
+                                if (slider) {
+                                    const scrollLeft = slider.scrollLeft;
+                                    const maxScroll = slider.scrollWidth - slider.clientWidth;
+                                    const pageCount = Math.ceil(
+                                        TESTIMONIALS.length / (window.innerWidth < 640 ? 1 : window.innerWidth < 1024 ? 2 : 3),
+                                    );
+                                    const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
+                                    setTestimonialsActivePage(Math.min(currentPage, pageCount - 1));
+                                }
+                            }}
+                        >
+                            {TESTIMONIALS.map((t, index) => (
+                                <article
+                                    key={index}
+                                    className="flex w-[calc(85%-8px)] shrink-0 snap-start flex-col rounded-xl border border-gray-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-14px)]"
+                                    role="listitem"
+                                >
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                        <div className="flex gap-0.5 text-(--theme-tertiary)">
+                                            {[...Array(5)].map((_, i) => (
+                                                <svg key={i} className="h-4 w-4 fill-current" viewBox="0 0 20 20" aria-hidden>
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                </svg>
+                                            ))}
+                                        </div>
+                                        <span className="text-[10px] font-medium text-(--theme-primary-1) sm:text-xs">{t.recent}</span>
+                                    </div>
+                                    <p className="mb-3 line-clamp-3 flex-1 text-sm leading-relaxed text-gray-700 sm:text-base">"{t.quote}"</p>
+                                    <div className="flex items-center gap-2 border-t border-gray-100 pt-2 sm:pt-3">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--theme-primary-1)/15 text-xs font-bold text-(--theme-primary-1) sm:h-9 sm:w-9 sm:text-sm">
+                                            {t.name.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-semibold text-gray-900">{t.name}</p>
+                                            <p className="flex items-center gap-1 truncate text-xs text-gray-600">
+                                                <MapPin className="h-3 w-3 shrink-0 text-(--theme-primary-1)" strokeWidth={2} />
+                                                {t.location}, Kerala
+                                            </p>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+
+                        {/* Mobile: Bottom nav with pagination */}
+                        <div className="flex items-center justify-center gap-4 lg:hidden">
                             <button
                                 type="button"
                                 onClick={() => {
                                     const slider = document.getElementById('testimonials-slider');
-                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 3, behavior: 'smooth' });
+                                    if (slider) slider.scrollBy({ left: -slider.offsetWidth / 1.5, behavior: 'smooth' });
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark)"
                                 aria-label="Previous testimonials"
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </button>
+
+                            {/* Pagination dots */}
+                            <div className="flex items-center gap-1.5">
+                                {[...Array(Math.min(5, Math.ceil(TESTIMONIALS.length / 1.5)))].map((_, i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => {
+                                            const slider = document.getElementById('testimonials-slider');
+                                            if (slider) slider.scrollTo({ left: i * slider.offsetWidth * 0.7, behavior: 'smooth' });
+                                        }}
+                                        className={`h-2 w-2 rounded-full transition-all ${
+                                            i === testimonialsActivePage ? 'bg-(--theme-primary-1)' : 'bg-gray-300 hover:bg-gray-400'
+                                        }`}
+                                        aria-label={`Go to testimonials page ${i + 1}`}
+                                    />
+                                ))}
+                            </div>
+
                             <button
                                 type="button"
                                 onClick={() => {
                                     const slider = document.getElementById('testimonials-slider');
-                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 3, behavior: 'smooth' });
+                                    if (slider) slider.scrollBy({ left: slider.offsetWidth / 1.5, behavior: 'smooth' });
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark) hover:shadow-lg"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark)"
                                 aria-label="Next testimonials"
                             >
                                 <ChevronRight className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
+                </section>
 
-                    {/* Testimonials Slider */}
-                    <div
-                        ref={testimonialsSliderRef}
-                        id="testimonials-slider"
-                        className="scrollbar-hide mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-4 lg:mb-0"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        role="list"
-                        onScroll={() => {
-                            const slider = testimonialsSliderRef.current;
-                            if (slider) {
-                                const scrollLeft = slider.scrollLeft;
-                                const maxScroll = slider.scrollWidth - slider.clientWidth;
-                                const pageCount = Math.ceil(TESTIMONIALS.length / (window.innerWidth < 640 ? 1 : window.innerWidth < 1024 ? 2 : 3));
-                                const currentPage = Math.round((scrollLeft / maxScroll) * (pageCount - 1));
-                                setTestimonialsActivePage(Math.min(currentPage, pageCount - 1));
-                            }
-                        }}
-                    >
-                        {TESTIMONIALS.map((t, index) => (
-                            <article
-                                key={index}
-                                className="flex w-[calc(85%-8px)] shrink-0 snap-start flex-col rounded-xl border border-gray-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-14px)]"
-                                role="listitem"
-                            >
-                                <div className="mb-2 flex items-center justify-between gap-2">
-                                    <div className="flex gap-0.5 text-(--theme-tertiary)">
-                                        {[...Array(5)].map((_, i) => (
-                                            <svg key={i} className="h-4 w-4 fill-current" viewBox="0 0 20 20" aria-hidden>
-                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                {/* Support – enhanced compact design */}
+                <section className="bg-linear-to-b from-white to-gray-50/30 py-8 sm:py-10 lg:py-12">
+                    <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch lg:gap-6">
+                            {/* Col 1: Active Support GIF + App CTA */}
+                            <div className="flex w-full flex-col gap-4">
+                                <div className="group relative flex h-40 w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-(--theme-primary-1)/10 to-(--theme-primary-1)/5 shadow-md transition-all duration-500 hover:shadow-lg sm:h-50 lg:h-55">
+                                    <img
+                                        src="/images/Active%20Support.gif"
+                                        alt="Mobile app support"
+                                        className="h-full max-h-full w-full max-w-full object-contain object-center p-3 transition-transform duration-500 group-hover:scale-105 sm:p-4"
+                                        loading="lazy"
+                                    />
+                                </div>
+                                <div className="shrink-0 rounded-xl bg-linear-to-r from-(--theme-primary-1) to-(--theme-primary-1-dark) p-4 shadow-lg sm:p-5">
+                                    <p className="text-xs font-semibold text-white/95 sm:text-sm">
+                                        Manage subscriptions from your phone — pause, increase, decrease anytime.
+                                    </p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <a
+                                            href="/login"
+                                            className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-(--theme-primary-1) shadow-sm transition-all duration-300 hover:scale-105 hover:bg-white/95 hover:shadow-md active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm"
+                                        >
+                                            Get Started
+                                        </a>
+                                        <a
+                                            href="/login"
+                                            className="rounded-lg border-2 border-white/80 bg-transparent px-4 py-2 text-xs font-semibold text-white transition-all duration-300 hover:scale-105 hover:border-white hover:bg-white/10 active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm"
+                                        >
+                                            Subscribe Now
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Col 2: Support contact card */}
+                            <div className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md transition-all duration-300 hover:shadow-lg">
+                                <div className="border-b border-gray-100 bg-linear-to-r from-gray-50 to-white px-4 py-3 sm:px-5 sm:py-3.5">
+                                    <h2 className="text-lg font-bold text-gray-900 sm:text-xl">Support</h2>
+                                    <p className="mt-0.5 text-xs text-gray-600 sm:text-sm">We're here to help you</p>
+                                </div>
+                                <div className="divide-y divide-gray-100">
+                                    <a
+                                        href="tel:7736121233"
+                                        className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
+                                    >
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-(--theme-primary-1)/30 group-hover:to-(--theme-primary-1)/20 sm:h-10 sm:w-10">
+                                            <Phone className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-(--theme-primary-1) sm:text-base">
+                                                Call Us
+                                            </p>
+                                            <p className="text-xs text-gray-600 sm:text-sm">7736121233</p>
+                                        </div>
+                                        <ExternalLink
+                                            className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-(--theme-primary-1) sm:h-5 sm:w-5"
+                                            strokeWidth={2}
+                                            aria-hidden
+                                        />
+                                    </a>
+                                    <a
+                                        href="https://wa.me/917736121233"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
+                                    >
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-[#25D366]/20 to-[#25D366]/10 text-[#25D366] shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-[#25D366]/30 group-hover:to-[#25D366]/20 sm:h-10 sm:w-10">
+                                            <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
                                             </svg>
-                                        ))}
-                                    </div>
-                                    <span className="text-[10px] font-medium text-(--theme-primary-1) sm:text-xs">{t.recent}</span>
-                                </div>
-                                <p className="mb-3 line-clamp-3 flex-1 text-sm leading-relaxed text-gray-700 sm:text-base">"{t.quote}"</p>
-                                <div className="flex items-center gap-2 border-t border-gray-100 pt-2 sm:pt-3">
-                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--theme-primary-1)/15 text-xs font-bold text-(--theme-primary-1) sm:h-9 sm:w-9 sm:text-sm">
-                                        {t.name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-semibold text-gray-900">{t.name}</p>
-                                        <p className="flex items-center gap-1 truncate text-xs text-gray-600">
-                                            <MapPin className="h-3 w-3 shrink-0 text-(--theme-primary-1)" strokeWidth={2} />
-                                            {t.location}, Kerala
-                                        </p>
-                                    </div>
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-
-                    {/* Mobile: Bottom nav with pagination */}
-                    <div className="flex items-center justify-center gap-4 lg:hidden">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('testimonials-slider');
-                                if (slider) slider.scrollBy({ left: -slider.offsetWidth / 1.5, behavior: 'smooth' });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark)"
-                            aria-label="Previous testimonials"
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </button>
-
-                        {/* Pagination dots */}
-                        <div className="flex items-center gap-1.5">
-                            {[...Array(Math.min(5, Math.ceil(TESTIMONIALS.length / 1.5)))].map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => {
-                                        const slider = document.getElementById('testimonials-slider');
-                                        if (slider) slider.scrollTo({ left: i * slider.offsetWidth * 0.7, behavior: 'smooth' });
-                                    }}
-                                    className={`h-2 w-2 rounded-full transition-all ${
-                                        i === testimonialsActivePage ? 'bg-(--theme-primary-1)' : 'bg-gray-300 hover:bg-gray-400'
-                                    }`}
-                                    aria-label={`Go to testimonials page ${i + 1}`}
-                                />
-                            ))}
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const slider = document.getElementById('testimonials-slider');
-                                if (slider) slider.scrollBy({ left: slider.offsetWidth / 1.5, behavior: 'smooth' });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-(--theme-primary-1) text-white shadow-md transition-all hover:bg-(--theme-primary-1-dark)"
-                            aria-label="Next testimonials"
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            {/* Support – enhanced compact design */}
-            <section className="bg-linear-to-b from-white to-gray-50/30 py-8 sm:py-10 lg:py-12">
-                <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch lg:gap-6">
-                        {/* Col 1: Active Support GIF + App CTA */}
-                        <div className="flex w-full flex-col gap-4">
-                            <div className="group relative flex h-40 w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-br from-(--theme-primary-1)/10 to-(--theme-primary-1)/5 shadow-md transition-all duration-500 hover:shadow-lg sm:h-50 lg:h-55">
-                                <img
-                                    src="/images/Active%20Support.gif"
-                                    alt="Mobile app support"
-                                    className="h-full max-h-full w-full max-w-full object-contain object-center p-3 transition-transform duration-500 group-hover:scale-105 sm:p-4"
-                                    loading="lazy"
-                                />
-                            </div>
-                            <div className="shrink-0 rounded-xl bg-linear-to-r from-(--theme-primary-1) to-(--theme-primary-1-dark) p-4 shadow-lg sm:p-5">
-                                <p className="text-xs font-semibold text-white/95 sm:text-sm">
-                                    Manage subscriptions from your phone — pause, increase, decrease anytime.
-                                </p>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <a
-                                        href="/login"
-                                        className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-(--theme-primary-1) shadow-sm transition-all duration-300 hover:scale-105 hover:bg-white/95 hover:shadow-md active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm"
-                                    >
-                                        Get Started
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-[#25D366] sm:text-base">
+                                                Chat With Us
+                                            </p>
+                                            <p className="text-xs text-gray-600 sm:text-sm">7736121233</p>
+                                        </div>
+                                        <ExternalLink
+                                            className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-[#25D366] sm:h-5 sm:w-5"
+                                            strokeWidth={2}
+                                            aria-hidden
+                                        />
                                     </a>
                                     <a
-                                        href="/login"
-                                        className="rounded-lg border-2 border-white/80 bg-transparent px-4 py-2 text-xs font-semibold text-white transition-all duration-300 hover:scale-105 hover:border-white hover:bg-white/10 active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm"
+                                        href="mailto:support@freshtick.in"
+                                        className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
                                     >
-                                        Subscribe Now
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-(--theme-primary-1)/30 group-hover:to-(--theme-primary-1)/20 sm:h-10 sm:w-10">
+                                            <Mail className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-(--theme-primary-1) sm:text-base">
+                                                Email Us
+                                            </p>
+                                            <p className="text-xs text-gray-600 sm:text-sm">support@freshtick.in</p>
+                                        </div>
+                                        <ExternalLink
+                                            className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-(--theme-primary-1) sm:h-5 sm:w-5"
+                                            strokeWidth={2}
+                                            aria-hidden
+                                        />
                                     </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Col 2: Support contact card */}
-                        <div className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md transition-all duration-300 hover:shadow-lg">
-                            <div className="border-b border-gray-100 bg-linear-to-r from-gray-50 to-white px-4 py-3 sm:px-5 sm:py-3.5">
-                                <h2 className="text-lg font-bold text-gray-900 sm:text-xl">Support</h2>
-                                <p className="mt-0.5 text-xs text-gray-600 sm:text-sm">We're here to help you</p>
-                            </div>
-                            <div className="divide-y divide-gray-100">
-                                <a
-                                    href="tel:7736121233"
-                                    className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
-                                >
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-(--theme-primary-1)/30 group-hover:to-(--theme-primary-1)/20 sm:h-10 sm:w-10">
-                                        <Phone className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-(--theme-primary-1) sm:text-base">
-                                            Call Us
-                                        </p>
-                                        <p className="text-xs text-gray-600 sm:text-sm">7736121233</p>
-                                    </div>
-                                    <ExternalLink
-                                        className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-(--theme-primary-1) sm:h-5 sm:w-5"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
-                                </a>
-                                <a
-                                    href="https://wa.me/917736121233"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
-                                >
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-[#25D366]/20 to-[#25D366]/10 text-[#25D366] shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-[#25D366]/30 group-hover:to-[#25D366]/20 sm:h-10 sm:w-10">
-                                        <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                                        </svg>
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-[#25D366] sm:text-base">
-                                            Chat With Us
-                                        </p>
-                                        <p className="text-xs text-gray-600 sm:text-sm">7736121233</p>
-                                    </div>
-                                    <ExternalLink
-                                        className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-[#25D366] sm:h-5 sm:w-5"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
-                                </a>
-                                <a
-                                    href="mailto:support@freshtick.in"
-                                    className="group flex items-center gap-3 px-4 py-3 transition-all duration-300 hover:bg-(--theme-primary-1)/5 sm:px-5 sm:py-3.5"
-                                >
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:from-(--theme-primary-1)/30 group-hover:to-(--theme-primary-1)/20 sm:h-10 sm:w-10">
-                                        <Mail className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-gray-900 transition-colors duration-300 group-hover:text-(--theme-primary-1) sm:text-base">
-                                            Email Us
-                                        </p>
-                                        <p className="text-xs text-gray-600 sm:text-sm">support@freshtick.in</p>
-                                    </div>
-                                    <ExternalLink
-                                        className="h-4 w-4 shrink-0 text-gray-400 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-(--theme-primary-1) sm:h-5 sm:w-5"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
-                                </a>
-                                <div className="flex items-start gap-3 px-4 py-3 sm:px-5 sm:py-3.5">
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm sm:h-10 sm:w-10">
-                                        <MapPin className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold text-gray-900 sm:text-base">Address</p>
-                                        <p className="mt-0.5 text-xs leading-relaxed text-gray-600 sm:text-sm">
-                                            Door No: VI / 404K, 2nd floor Karakattu Building, Nayarambalam PO, Nayarambalam, Puduvypin, Kochi, Kerala,
-                                            India, 682509
-                                        </p>
+                                    <div className="flex items-start gap-3 px-4 py-3 sm:px-5 sm:py-3.5">
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-(--theme-primary-1)/20 to-(--theme-primary-1)/10 text-(--theme-primary-1) shadow-sm sm:h-10 sm:w-10">
+                                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 sm:text-base">Address</p>
+                                            <p className="mt-0.5 text-xs leading-relaxed text-gray-600 sm:text-sm">
+                                                Door No: VI / 404K, 2nd floor Karakattu Building, Nayarambalam PO, Nayarambalam, Puduvypin, Kochi,
+                                                Kerala, India, 682509
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </SocietyHomeSections>
         </UserLayout>
     );
 }

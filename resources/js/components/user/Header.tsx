@@ -19,7 +19,7 @@ import {
     X,
     ChevronRight,
 } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import LocationModal from '@/components/user/LocationModal';
 
 const NAV_LINKS = [
@@ -48,13 +48,14 @@ interface UserData {
     avatar?: string;
 }
 
+type VerticalOption = 'daily_fresh' | 'society_fresh';
+
 export default function Header({ showTopBanner }: HeaderProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [webMenuOpen, setWebMenuOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [desktopSearchQuery, setDesktopSearchQuery] = useState('');
-    const userMenuRef = useRef<HTMLDivElement>(null);
+    const { url } = usePage();
 
     const pageProps = usePage().props as unknown as {
         auth?: { user?: UserData; wishlisted_products?: number[] };
@@ -72,6 +73,10 @@ export default function Header({ showTopBanner }: HeaderProps) {
     const compactAddress = addressWords.slice(0, 3).join(' ');
     const locationDisplay =
         compactAddress !== '' ? `${compactAddress}${addressWords.length > 3 ? '…' : ''}` : location?.city || zone?.name || 'Select location';
+    const [currentPath, currentQuery = ''] = url.split('?');
+    const queryParams = new URLSearchParams(currentQuery);
+    const urlVertical: VerticalOption = queryParams.get('vertical') === 'society_fresh' ? 'society_fresh' : 'daily_fresh';
+    const [activeVertical, setActiveVertical] = useState<VerticalOption>(urlVertical);
 
     const actionIconButtonClass =
         'flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-(--theme-primary-1) focus:ring-offset-2 focus:outline-none';
@@ -115,22 +120,30 @@ export default function Header({ showTopBanner }: HeaderProps) {
     }, [mobileMenuOpen, webMenuOpen]);
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-                setUserMenuOpen(false);
-            }
-        };
-
-        if (userMenuOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [userMenuOpen]);
+        setActiveVertical(urlVertical);
+    }, [urlVertical]);
 
     const handleLogout = () => {
         router.post('/logout');
+    };
+
+    const handleVerticalToggle = (vertical: VerticalOption) => {
+        if (activeVertical === vertical) {
+            return;
+        }
+
+        setActiveVertical(vertical);
+
+        const nextParams = new URLSearchParams(currentQuery);
+        nextParams.set('vertical', vertical);
+
+        const nextQuery = nextParams.toString();
+        const nextUrl = nextQuery ? `${currentPath}?${nextQuery}` : currentPath;
+
+        router.visit(nextUrl, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
 
     const handleDesktopSearch = (event: React.FormEvent<HTMLFormElement>) => {
@@ -193,6 +206,31 @@ export default function Header({ showTopBanner }: HeaderProps) {
                                 </div>
                             </form>
 
+                            <div className="hidden items-center rounded-full border border-gray-200 bg-gray-50 p-0.5 lg:flex">
+                                <button
+                                    type="button"
+                                    onClick={() => handleVerticalToggle('daily_fresh')}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus:outline-none ${
+                                        activeVertical === 'daily_fresh'
+                                            ? 'bg-(--theme-primary-1) text-white'
+                                            : 'text-gray-600 hover:text-(--theme-primary-1)'
+                                    }`}
+                                >
+                                    Daily
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleVerticalToggle('society_fresh')}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors focus:outline-none ${
+                                        activeVertical === 'society_fresh'
+                                            ? 'bg-(--theme-primary-1) text-white'
+                                            : 'text-gray-600 hover:text-(--theme-primary-1)'
+                                    }`}
+                                >
+                                    Society
+                                </button>
+                            </div>
+
                             <Link href="/wishlist" className={`${actionIconButtonClass} relative`} aria-label="Wishlist">
                                 <Heart className="h-3.5 w-3.5" strokeWidth={2} />
                                 {wishlistCount > 0 && (
@@ -210,63 +248,6 @@ export default function Header({ showTopBanner }: HeaderProps) {
                                     </span>
                                 )}
                             </Link>
-
-                            <div className="relative" ref={userMenuRef}>
-                                {authUser ? (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                            className={actionIconButtonClass}
-                                            aria-label="User Menu"
-                                        >
-                                            <span className="text-[10px] font-semibold">{(authUser.name || 'U').charAt(0).toUpperCase()}</span>
-                                        </button>
-
-                                        {userMenuOpen && (
-                                            <div className="ring-opacity-5 absolute top-full right-0 mt-2 w-64 origin-top-right rounded-xl border border-gray-100 bg-white p-2 shadow-lg ring-1 ring-black focus:outline-none">
-                                                <div className="mb-2 px-3 py-2">
-                                                    <p className="truncate text-sm font-medium text-gray-900">{authUser.name || 'User'}</p>
-                                                    <p className="truncate text-xs text-gray-500">{authUser.email || ''}</p>
-                                                </div>
-                                                <div className="h-px bg-gray-100" />
-                                                <div className="py-1">
-                                                    <Link
-                                                        href="/profile"
-                                                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                                        onClick={() => setUserMenuOpen(false)}
-                                                    >
-                                                        <Settings className="h-4 w-4" />
-                                                        Profile & Settings
-                                                    </Link>
-                                                    <Link
-                                                        href="/profile"
-                                                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                                        onClick={() => setUserMenuOpen(false)}
-                                                    >
-                                                        <LayoutDashboard className="h-4 w-4" />
-                                                        Dashboard
-                                                    </Link>
-                                                </div>
-                                                <div className="h-px bg-gray-100" />
-                                                <div className="mt-1">
-                                                    <button
-                                                        onClick={handleLogout}
-                                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
-                                                    >
-                                                        <LogOut className="h-4 w-4" />
-                                                        Sign out
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <Link href="/login" className={actionIconButtonClass} aria-label="Login">
-                                        <User className="h-3.5 w-3.5" strokeWidth={2} />
-                                    </Link>
-                                )}
-                            </div>
 
                             <button
                                 type="button"
@@ -352,6 +333,61 @@ export default function Header({ showTopBanner }: HeaderProps) {
                             <MapPin className="h-4 w-4 shrink-0" strokeWidth={2} />
                             <span className="truncate">{locationDisplay}</span>
                         </button>
+
+                        <div className="my-2 border-t border-gray-100" />
+
+                        {authUser ? (
+                            <>
+                                <Link
+                                    href="/profile"
+                                    onClick={() => setWebMenuOpen(false)}
+                                    className="group flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-(--theme-primary-1)"
+                                >
+                                    <span className="flex items-center gap-2.5">
+                                        <User className="h-4 w-4 shrink-0 text-gray-500 group-hover:text-(--theme-primary-1)" strokeWidth={2} />
+                                        Profile
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+                                </Link>
+                                <Link
+                                    href="/profile"
+                                    onClick={() => setWebMenuOpen(false)}
+                                    className="group flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-(--theme-primary-1)"
+                                >
+                                    <span className="flex items-center gap-2.5">
+                                        <Settings className="h-4 w-4 shrink-0 text-gray-500 group-hover:text-(--theme-primary-1)" strokeWidth={2} />
+                                        Settings
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setWebMenuOpen(false);
+                                        handleLogout();
+                                    }}
+                                    className="group flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
+                                >
+                                    <span className="flex items-center gap-2.5">
+                                        <LogOut className="h-4 w-4 shrink-0" strokeWidth={2} />
+                                        Logout
+                                    </span>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-rose-300" strokeWidth={2} />
+                                </button>
+                            </>
+                        ) : (
+                            <Link
+                                href="/login"
+                                onClick={() => setWebMenuOpen(false)}
+                                className="group flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 hover:text-(--theme-primary-1)"
+                            >
+                                <span className="flex items-center gap-2.5">
+                                    <User className="h-4 w-4 shrink-0 text-gray-500 group-hover:text-(--theme-primary-1)" strokeWidth={2} />
+                                    Login
+                                </span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+                            </Link>
+                        )}
                     </nav>
                 </aside>
             </div>
