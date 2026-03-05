@@ -306,10 +306,10 @@ export default function Products() {
                                                         toggleWishlist(product.id);
                                                     }}
                                                     aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                                    className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white sm:top-1.5 sm:right-1.5 sm:h-7 sm:w-7"
+                                                    className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors sm:top-1.5 sm:right-1.5 sm:h-7 sm:w-7"
                                                 >
                                                     <Heart
-                                                        className={`h-3 w-3 sm:h-4 sm:w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                                        className={`h-3 w-3 sm:h-4 sm:w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                         strokeWidth={2}
                                                     />
                                                 </button>

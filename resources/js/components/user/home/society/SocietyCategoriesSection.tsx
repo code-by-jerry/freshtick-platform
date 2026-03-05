@@ -22,6 +22,24 @@ export default function SocietyCategoriesSection({
     categoryActivePage,
     setCategoryActivePage,
 }: SocietyCategoriesSectionProps) {
+    const defaultCategoryImage = '/images/dairy-products.png';
+
+    const resolveCategoryImage = (image: string | null) => {
+        if (!image) {
+            return defaultCategoryImage;
+        }
+
+        if (image.startsWith('http') || image.startsWith('/')) {
+            return image;
+        }
+
+        if (image.startsWith('demo/') || image.startsWith('images/') || image.startsWith('video/')) {
+            return `/${image}`;
+        }
+
+        return `/storage/${image}`;
+    };
+
     return (
         <section className="bg-white py-10 sm:py-12 lg:py-14" aria-labelledby="trending-categories-heading">
             <div className="container mx-auto px-3 sm:px-4 lg:px-6">
@@ -84,7 +102,7 @@ export default function SocietyCategoriesSection({
                 <div
                     ref={categorySliderRef}
                     id="category-slider"
-                    className="scrollbar-hide flex snap-x snap-mandatory gap-2 overflow-x-auto sm:gap-3 lg:gap-3"
+                    className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto sm:gap-3 lg:gap-3"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     onScroll={() => {
                         const slider = categorySliderRef.current;
@@ -106,10 +124,13 @@ export default function SocietyCategoriesSection({
                             <div className="aspect-square w-full overflow-hidden bg-linear-to-br from-gray-50 to-gray-100">
                                 {category.image ? (
                                     <img
-                                        src={category.image}
+                                        src={resolveCategoryImage(category.image)}
                                         alt={category.name}
                                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
                                         loading="lazy"
+                                        onError={(event) => {
+                                            (event.target as HTMLImageElement).src = defaultCategoryImage;
+                                        }}
                                     />
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-(--theme-primary-1)/10 to-(--theme-primary-1)/5">

@@ -21,16 +21,13 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import LocationModal from '@/components/user/LocationModal';
+import { getVerticalFromQuery, type StrictVertical } from '@/lib/vertical';
 
 const NAV_LINKS = [
     { label: 'Home', href: '/', icon: Home },
     { label: 'Products', href: '/products', icon: Package },
     { label: 'Subscriptions', href: '/subscription', icon: Repeat },
 ];
-
-interface HeaderProps {
-    showTopBanner: boolean;
-}
 
 interface Location {
     address_line_1: string;
@@ -48,13 +45,16 @@ interface UserData {
     avatar?: string;
 }
 
-type VerticalOption = 'daily_fresh' | 'society_fresh';
+interface HeaderProps {
+    showTopBanner: boolean;
+}
 
 export default function Header({ showTopBanner }: HeaderProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [webMenuOpen, setWebMenuOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [desktopSearchQuery, setDesktopSearchQuery] = useState('');
+    const [isMobileSearchPinned, setIsMobileSearchPinned] = useState(false);
     const { url } = usePage();
 
     const pageProps = usePage().props as unknown as {
@@ -74,9 +74,9 @@ export default function Header({ showTopBanner }: HeaderProps) {
     const locationDisplay =
         compactAddress !== '' ? `${compactAddress}${addressWords.length > 3 ? '…' : ''}` : location?.city || zone?.name || 'Select location';
     const [currentPath, currentQuery = ''] = url.split('?');
-    const queryParams = new URLSearchParams(currentQuery);
-    const urlVertical: VerticalOption = queryParams.get('vertical') === 'society_fresh' ? 'society_fresh' : 'daily_fresh';
-    const [activeVertical, setActiveVertical] = useState<VerticalOption>(urlVertical);
+    const urlVertical = getVerticalFromQuery(currentQuery);
+    const [activeVertical, setActiveVertical] = useState<StrictVertical>(urlVertical);
+    const mobileHeaderTitle = 'High Quality, Freshness';
 
     const actionIconButtonClass =
         'flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-(--theme-primary-1) focus:ring-offset-2 focus:outline-none';
@@ -101,7 +101,9 @@ export default function Header({ showTopBanner }: HeaderProps) {
     }, [authUser, zone]);
 
     useEffect(() => {
-        if (!mobileMenuOpen && !webMenuOpen) return;
+        if (!mobileMenuOpen && !webMenuOpen) {
+            return;
+        }
 
         const onEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -123,11 +125,37 @@ export default function Header({ showTopBanner }: HeaderProps) {
         setActiveVertical(urlVertical);
     }, [urlVertical]);
 
+    useEffect(() => {
+        const handleMobileScroll = () => {
+            if (window.innerWidth >= 1024) {
+                setIsMobileSearchPinned(false);
+
+                return;
+            }
+
+            setIsMobileSearchPinned((previousPinned) => {
+                const pinThreshold = 32;
+                const unpinThreshold = 10;
+
+                return previousPinned ? window.scrollY > unpinThreshold : window.scrollY > pinThreshold;
+            });
+        };
+
+        handleMobileScroll();
+        window.addEventListener('scroll', handleMobileScroll, { passive: true });
+        window.addEventListener('resize', handleMobileScroll);
+
+        return () => {
+            window.removeEventListener('scroll', handleMobileScroll);
+            window.removeEventListener('resize', handleMobileScroll);
+        };
+    }, []);
+
     const handleLogout = () => {
         router.post('/logout');
     };
 
-    const handleVerticalToggle = (vertical: VerticalOption) => {
+    const handleVerticalToggle = (vertical: StrictVertical) => {
         if (activeVertical === vertical) {
             return;
         }
@@ -163,12 +191,103 @@ export default function Header({ showTopBanner }: HeaderProps) {
     return (
         <>
             <header
-                className={`fixed right-0 left-0 z-1200 border-b bg-white transition-all duration-300 ease-out ${
-                    showTopBanner ? 'top-8 border-gray-100' : 'top-0 border-gray-200 shadow-sm'
+                className={`right-0 left-0 z-1200 border-b border-gray-200 bg-white shadow-sm transition-all duration-300 ease-out lg:fixed ${
+                    showTopBanner ? 'lg:top-8' : 'lg:top-0'
                 }`}
             >
-                <div className="container mx-auto max-w-7xl px-4 sm:px-5 lg:px-6">
-                    <div className="flex items-center justify-between gap-2.5 py-2 sm:py-2.5 lg:py-2.5">
+                <div className="bg-(--theme-primary-1-dark) px-3 py-2 text-white lg:hidden">
+                    <div
+                        className={`overflow-hidden transition-all duration-300 ease-out ${
+                            isMobileSearchPinned ? 'max-h-0 -translate-y-1 opacity-0' : 'max-h-44 translate-y-0 opacity-100'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsLocationModalOpen(true)}
+                                className="min-w-0 flex-1 text-left focus:outline-none"
+                                aria-label="Select location"
+                            >
+                                <div className="truncate text-base leading-tight font-semibold">{mobileHeaderTitle}</div>
+                                <div className="mt-0.5 flex items-center gap-1 text-xs text-white/90">
+                                    <span className="truncate">{locationDisplay}</span>
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 rotate-90" strokeWidth={2} />
+                                </div>
+                            </button>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Link
+                                    href="/wallet"
+                                    className="inline-flex items-center gap-1.5 rounded-2xl border border-white/50 bg-white px-2.5 py-1 text-(--theme-primary-1-dark) shadow-sm"
+                                    aria-label="Wallet"
+                                >
+                                    <Wallet className="h-4 w-4" strokeWidth={2.2} />
+                                    <span className="text-sm font-semibold">₹0</span>
+                                </Link>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileMenuOpen(true)}
+                                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-transparent text-white focus:ring-2 focus:ring-white/80 focus:ring-offset-1 focus:ring-offset-(--theme-primary-1-dark) focus:outline-none"
+                                    aria-label="Open menu"
+                                >
+                                    <User className="h-5 w-5" strokeWidth={2} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 rounded-2xl bg-[#4dbfa6]/30 p-1.5">
+                            <div className="grid grid-cols-2 gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => handleVerticalToggle('daily_fresh')}
+                                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus:outline-none ${
+                                        activeVertical === 'daily_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#4dbfa6] shadow-sm'
+                                    }`}
+                                >
+                                    Daily Fresh
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleVerticalToggle('society_fresh')}
+                                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus:outline-none ${
+                                        activeVertical === 'society_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#4dbfa6] shadow-sm'
+                                    }`}
+                                >
+                                    Society Fresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form
+                        onSubmit={handleDesktopSearch}
+                        className={
+                            isMobileSearchPinned
+                                ? 'fixed top-0 right-0 left-0 z-1200 bg-(--theme-primary-1-dark) px-3 py-2 shadow-md transition-all duration-300 ease-out'
+                                : 'mt-3 transition-all duration-300 ease-out'
+                        }
+                    >
+                        <div className="relative">
+                            <Search
+                                className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-gray-700"
+                                strokeWidth={2.2}
+                            />
+                            <input
+                                type="search"
+                                value={desktopSearchQuery}
+                                onChange={(event) => setDesktopSearchQuery(event.target.value)}
+                                placeholder='Search for "Milk"'
+                                className="h-11 w-full rounded-2xl border border-white/60 bg-white py-2 pr-3 pl-11 text-base text-gray-800 outline-none placeholder:text-gray-700/80"
+                            />
+                        </div>
+                    </form>
+
+                    {isMobileSearchPinned && <div className="h-15" aria-hidden="true" />}
+                </div>
+
+                <div className="container mx-auto hidden max-w-7xl px-4 sm:px-5 lg:block lg:px-6">
+                    <div className="items-center justify-between gap-2.5 py-2 sm:py-2.5 lg:flex lg:py-2.5">
                         <div className="flex min-w-0 items-center gap-3 lg:gap-4">
                             <Link
                                 href="/"
@@ -256,15 +375,6 @@ export default function Header({ showTopBanner }: HeaderProps) {
                                 aria-label="More options"
                             >
                                 <Menu className="h-3.5 w-3.5" strokeWidth={2} />
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setMobileMenuOpen(true)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 hover:bg-(--theme-primary-1)/10 hover:text-(--theme-primary-1) focus:ring-2 focus:ring-(--theme-primary-1) focus:ring-offset-2 focus:outline-none lg:hidden"
-                                aria-label="Open menu"
-                            >
-                                <Menu className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2} />
                             </button>
                         </div>
                     </div>

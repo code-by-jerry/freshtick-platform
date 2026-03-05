@@ -182,10 +182,10 @@ export default function SocietyProductsSection({
                                             toggleProductWishlist(product.id);
                                         }}
                                         aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                        className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white sm:h-8 sm:w-8"
+                                        className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 sm:h-8 sm:w-8"
                                     >
                                         <Heart
-                                            className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'text-gray-400 group-hover:text-red-400'}`}
+                                            className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                             strokeWidth={2}
                                         />
                                     </button>

@@ -250,7 +250,7 @@ export default function ProductPage({
                                     className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-pink-500 px-4 py-3 text-sm font-semibold text-pink-600 transition-colors hover:bg-pink-50 sm:w-auto"
                                 >
                                     <Heart
-                                        className={`h-4 w-4 ${isCurrentProductWishlisted ? 'fill-pink-500 text-pink-500' : 'text-pink-500'}`}
+                                        className={`h-4 w-4 ${isCurrentProductWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                         strokeWidth={2}
                                     />
                                     <span>Wishlist</span>
@@ -306,10 +306,10 @@ export default function ProductPage({
                                             type="button"
                                             onClick={(event) => toggleWishlist(event, item.id)}
                                             aria-label={wishlistedProductIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors"
                                         >
                                             <Heart
-                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                 strokeWidth={2}
                                             />
                                         </button>
@@ -352,10 +352,10 @@ export default function ProductPage({
                                             type="button"
                                             onClick={(event) => toggleWishlist(event, item.id)}
                                             aria-label={wishlistedProductIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors"
                                         >
                                             <Heart
-                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                 strokeWidth={2}
                                             />
                                         </button>
@@ -398,10 +398,10 @@ export default function ProductPage({
                                             type="button"
                                             onClick={(event) => toggleWishlist(event, item.id)}
                                             aria-label={wishlistedProductIds.has(item.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors"
                                         >
                                             <Heart
-                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                                className={`h-4 w-4 ${wishlistedProductIds.has(item.id) ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                 strokeWidth={2}
                                             />
                                         </button>

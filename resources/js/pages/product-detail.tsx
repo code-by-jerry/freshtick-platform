@@ -241,10 +241,10 @@ export default function ProductDetail({ product, price, relatedProducts }: Produ
                                         triggerToggleWishlist(product.id);
                                     }}
                                     aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                    className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+                                    className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full transition-colors"
                                 >
                                     <Heart
-                                        className={`h-4 w-4 ${wishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500 hover:text-red-400'}`}
+                                        className={`h-4 w-4 ${wishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                         strokeWidth={2}
                                     />
                                 </button>
@@ -358,7 +358,10 @@ export default function ProductDetail({ product, price, relatedProducts }: Produ
                                     aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                                     className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-pink-500 px-4 py-3 text-sm font-semibold text-pink-600 transition-colors hover:bg-pink-50 sm:w-auto"
                                 >
-                                    <Heart className={`h-4 w-4 ${wishlisted ? 'fill-pink-500 text-pink-500' : 'text-pink-500'}`} strokeWidth={2} />
+                                    <Heart
+                                        className={`h-4 w-4 ${wishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                        strokeWidth={2}
+                                    />
                                     <span>Wishlist</span>
                                 </button>
                                 {isPlan && (
@@ -493,10 +496,10 @@ export default function ProductDetail({ product, price, relatedProducts }: Produ
                                                     type="button"
                                                     onClick={(e) => toggleSimilarWishlist(e, p.id)}
                                                     aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                                    className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white sm:top-1.5 sm:right-1.5 sm:h-7 sm:w-7"
+                                                    className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors sm:top-1.5 sm:right-1.5 sm:h-7 sm:w-7"
                                                 >
                                                     <Heart
-                                                        className={`h-3 w-3 sm:h-4 sm:w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                                        className={`h-3 w-3 sm:h-4 sm:w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                         strokeWidth={2}
                                                     />
                                                 </button>

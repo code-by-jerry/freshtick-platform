@@ -127,10 +127,10 @@ export default function SearchPage({ query, vertical, products }: SearchPageProp
                                         type="button"
                                         onClick={(event) => toggleWishlist(event, product.id)}
                                         aria-label={wishlistedProductIds.has(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                                        className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm transition-colors hover:bg-white"
+                                        className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors"
                                     >
                                         <Heart
-                                            className={`h-4 w-4 ${wishlistedProductIds.has(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`}
+                                            className={`h-4 w-4 ${wishlistedProductIds.has(product.id) ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                             strokeWidth={2}
                                         />
                                     </button>

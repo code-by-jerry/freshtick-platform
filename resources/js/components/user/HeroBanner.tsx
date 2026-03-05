@@ -53,7 +53,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
     const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + displayBanners.length) % displayBanners.length);
 
     return (
-        <section className="relative w-full pt-22 sm:pt-22 lg:pt-23">
+        <section className="relative w-full pt-0 sm:pt-0 lg:pt-23">
             {/* Mobile: Simple auto-height banner without thumbnails */}
             <div className="h-auto w-full lg:hidden">
                 <div
@@ -90,7 +90,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
 
                     {/* Mobile Dot Indicators */}
                     {displayBanners.length > 1 && (
-                        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
+                        <div className="absolute bottom-0 left-1/2 z-20 flex -translate-x-1/2 gap-1.5">
                             {displayBanners.map((_, index) => (
                                 <button
                                     key={index}

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Heart, X, ArrowRight, PackageOpen, Tag, Star } from 'lucide-react';
+import { Heart, ArrowRight, PackageOpen, Tag, Star, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import UserLayout from '@/layouts/UserLayout';
 import { product as productRoute } from '@/routes/catalog';
@@ -69,7 +69,7 @@ export default function Wishlist({ products }: WishlistPageProps) {
                     <div className="mb-6 sm:mb-8">
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100">
-                                <Heart className="h-5 w-5 fill-red-500 text-red-500" strokeWidth={2} />
+                                <Heart className="h-5 w-5 text-red-500" strokeWidth={2} />
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">My Wishlist</h1>
@@ -121,9 +121,9 @@ export default function Wishlist({ products }: WishlistPageProps) {
                                             type="button"
                                             onClick={() => handleRemove(product.id)}
                                             aria-label="Remove from wishlist"
-                                            className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm transition-all hover:bg-red-50 hover:text-red-500"
+                                            className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:text-red-500"
                                         >
-                                            <X className="h-4 w-4 text-gray-500 transition-colors hover:text-red-500" strokeWidth={2} />
+                                            <Heart className="h-4 w-4 fill-red-500 text-red-500" strokeWidth={2} />
                                         </button>
 
                                         {/* Discount badge */}

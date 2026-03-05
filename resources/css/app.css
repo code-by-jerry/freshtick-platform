@@ -4,13 +4,12 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
 @theme {
-    --font-sans:
-        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
 /* App theme (overridden by JS from DB) */
 :root {
-    --theme-primary-1: #45AE96;
+    --theme-primary-1: #45ae96;
     --theme-primary-2: #46ae97;
     --theme-secondary: #c4f5ea;
     --theme-tertiary: #cf992c;
@@ -35,7 +34,8 @@
 }
 
 @keyframes float {
-    0%, 100% {
+    0%,
+    100% {
         transform: translateY(0) rotate(0deg);
     }
     50% {
@@ -44,7 +44,8 @@
 }
 
 @keyframes float-delayed {
-    0%, 100% {
+    0%,
+    100% {
         transform: translateY(0) rotate(0deg);
     }
     50% {
@@ -75,7 +76,9 @@
 .marquee-text-thick {
     font-weight: 800;
     letter-spacing: 0.02em;
-    text-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(0, 0, 0, 0.04);
+    text-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.06),
+        0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .marquee-text-outline {
@@ -155,6 +158,15 @@
     scroll-snap-stop: normal;
 }
 
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
 /* Morning delivery – rectangle-based fluid shape (rounded corners breathe) */
 .morning-video-frame {
     border-radius: 1.25rem;
@@ -162,10 +174,19 @@
 }
 
 @keyframes morning-rect-breathe {
-    0%, 100% { border-radius: 1.25rem; }
-    25% { border-radius: 1.5rem 1.25rem 1.5rem 1.25rem; }
-    50% { border-radius: 1.75rem; }
-    75% { border-radius: 1.25rem 1.5rem 1.25rem 1.5rem; }
+    0%,
+    100% {
+        border-radius: 1.25rem;
+    }
+    25% {
+        border-radius: 1.5rem 1.25rem 1.5rem 1.25rem;
+    }
+    50% {
+        border-radius: 1.75rem;
+    }
+    75% {
+        border-radius: 1.25rem 1.5rem 1.25rem 1.5rem;
+    }
 }
 
 /* Morning video – professional angled shape (hero-style) */
@@ -218,8 +239,13 @@ html {
     animation-delay: -4s;
 }
 @keyframes icon-bg-breathe {
-    0%, 100% { opacity: 0.06; }
-    50% { opacity: 0.1; }
+    0%,
+    100% {
+        opacity: 0.06;
+    }
+    50% {
+        opacity: 0.1;
+    }
 }
 
 /* Mobile-first responsive improvements */
@@ -228,7 +254,7 @@ html {
         padding-left: 1rem;
         padding-right: 1rem;
     }
-    
+
     .hero-image-shape {
         clip-path: polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%);
     }
@@ -255,7 +281,9 @@ html {
     right: 0;
     width: 100px;
     height: 100%;
-    box-shadow: 0 0 10px var(--theme-primary-1, #4caf9a), 0 0 5px var(--theme-primary-1, #4caf9a);
+    box-shadow:
+        0 0 10px var(--theme-primary-1, #4caf9a),
+        0 0 5px var(--theme-primary-1, #4caf9a);
     opacity: 1;
     transform: rotate(3deg) translate(0px, -4px);
 }

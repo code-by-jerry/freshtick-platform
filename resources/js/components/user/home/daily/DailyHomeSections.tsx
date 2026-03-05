@@ -1,5 +1,4 @@
 import { Link } from '@inertiajs/react';
-
 export default function DailyHomeSections() {
     return (
         <section className="bg-white py-16 lg:py-20">

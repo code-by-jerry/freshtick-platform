@@ -44,13 +44,13 @@ Route::get('/', function () {
 
     $categories = \App\Models\Category::active()
         ->ordered()
-        ->limit(5)
         ->get()
         ->map(fn (\App\Models\Category $category) => [
             'id' => $category->id,
             'name' => $category->name,
             'slug' => $category->slug,
             'image' => $category->image,
+            'vertical' => $category->vertical,
         ]);
 
     $products = \App\Models\Product::with('variants')

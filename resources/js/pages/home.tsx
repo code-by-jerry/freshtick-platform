@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, Mail, Package, Phone, Play, ShoppingCart, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, MapPin, Mail, Phone, Play, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import HeroBanner from '@/components/user/HeroBanner';
 import DailyHomeSections from '@/components/user/home/daily/DailyHomeSections';
@@ -8,9 +8,8 @@ import SocietyDeliveryMarqueeSection from '@/components/user/home/society/Societ
 import SocietyHomeSections from '@/components/user/home/society/SocietyHomeSections';
 import SocietyProductsSection from '@/components/user/home/society/SocietyProductsSection';
 import SocietySubscriptionStepsSection from '@/components/user/home/society/SocietySubscriptionStepsSection';
-import ProductCardMedia, { type MediaItem } from '@/components/user/ProductCardMedia';
 import UserLayout from '@/layouts/UserLayout';
-import { product as productRoute } from '@/routes/catalog';
+import { getVerticalFromQuery } from '@/lib/vertical';
 
 interface ProductVariant {
     id: number;
@@ -60,8 +59,6 @@ const carouselSlides: CarouselSlide[] = [
 ];
 */
 
-const SUBSCRIPTION_FEATURES = ['Daily Morning delivery', 'Free delivery', 'Pause/Resume anytime', 'Vacation hold', 'WhatsApp alerts'];
-
 const TESTIMONIALS = [
     { quote: 'Milk tastes just like village milk. Delivery is always on time.', name: 'Rashid', location: 'Malappuram', recent: '2 days ago' },
     { quote: 'Fresh curd every morning. My family loves it!', name: 'Priya', location: 'Manjeri', recent: '1 week ago' },
@@ -104,6 +101,7 @@ interface Category {
     name: string;
     slug: string;
     image: string | null;
+    vertical?: string;
 }
 
 interface SubscriptionPlanItem {
@@ -143,20 +141,17 @@ export default function Home({ banners, categories, products = [], subscriptionP
     // Old carousel state - removed (using HeroBanner component now)
     // const [currentSlide, setCurrentSlide] = useState(0);
 
-    const [productIndex, setProductIndex] = useState(0);
     const [cardsPerView, setCardsPerView] = useState(4);
-    const [stepPx, setStepPx] = useState(0);
-    const [subVariant, setSubVariant] = useState<'480ml' | '1L'>('480ml');
+    const [, setStepPx] = useState(0);
     const [testimonialCardsPerView, setTestimonialCardsPerView] = useState(1);
-    const [testimonialIndex, setTestimonialIndex] = useState(0);
-    const [testimonialStepPx, setTestimonialStepPx] = useState(0);
+    const [, setTestimonialStepPx] = useState(0);
     const [similarCardMediaIndex, setSimilarCardMediaIndex] = useState<Record<string, number>>({});
     const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
     const [storyProgress, setStoryProgress] = useState(0);
     const page = usePage<{ auth?: { user?: unknown; wishlisted_products?: number[] } }>();
     const auth = page.props.auth;
     const [, currentQuery = ''] = page.url.split('?');
-    const selectedVertical = new URLSearchParams(currentQuery).get('vertical') === 'daily_fresh' ? 'daily_fresh' : 'society_fresh';
+    const selectedVertical = getVerticalFromQuery(currentQuery);
     const wishlistedProductIds = new Set(auth?.wishlisted_products || []);
     const [selectedVariants, setSelectedVariants] = useState<Record<number, number>>({});
     const [categoryActivePage, setCategoryActivePage] = useState(0);
@@ -199,9 +194,12 @@ export default function Home({ banners, categories, products = [], subscriptionP
         setSimilarCardMediaIndex((prev) => ({ ...prev, [key]: index }));
     };
 
+    const DEFAULT_IMAGE_FALLBACK = '/images/dairy-products.png';
+
     const getSafeUrl = (url: string | null | undefined) => {
-        if (!url) return '/placeholder.png';
+        if (!url) return DEFAULT_IMAGE_FALLBACK;
         if (url.startsWith('http') || url.startsWith('/')) return url;
+        if (url.startsWith('demo/') || url.startsWith('images/') || url.startsWith('video/')) return `/${url}`;
         return `/storage/${url}`;
     };
 
@@ -218,6 +216,10 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const getSelectedVariantId = (product: ProductItem) => {
         return selectedVariants[product.id] ?? (product.variants.length > 0 ? product.variants[0].id : null);
     };
+
+    const dailyCategories = categories.filter((category) => category.vertical === 'daily_fresh' || category.vertical === 'both');
+    const societyCategories = categories.filter((category) => category.vertical === 'society_fresh' || category.vertical === 'both');
+    const mobileCategories = selectedVertical === 'daily_fresh' ? dailyCategories : societyCategories;
 
     const formatPrice = (price: number) => {
         return '₹' + price.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -300,22 +302,37 @@ export default function Home({ banners, categories, products = [], subscriptionP
         };
     }, [storyViewerIndex]);
 
-    const productMaxIndex = Math.max(0, products.length - cardsPerView);
-    const canGoPrev = productIndex > 0;
-    const canGoNext = productIndex < productMaxIndex;
-    const goPrev = () => setProductIndex((i) => Math.max(0, i - 1));
-    const goNext = () => setProductIndex((i) => Math.min(productMaxIndex, i + 1));
-
-    const testimonialMaxIndex = Math.max(0, TESTIMONIALS.length - testimonialCardsPerView);
-    const canGoPrevTestimonial = testimonialIndex > 0;
-    const canGoNextTestimonial = testimonialIndex < testimonialMaxIndex;
-    const goPrevTestimonial = () => setTestimonialIndex((i) => Math.max(0, i - 1));
-    const goNextTestimonial = () => setTestimonialIndex((i) => Math.min(testimonialMaxIndex, i + 1));
-
     if (selectedVertical === 'daily_fresh') {
         return (
             <UserLayout>
                 <Head title="FreshTick - Daily Fresh" />
+
+                {mobileCategories.length > 0 && (
+                    <section className="bg-white py-2 lg:hidden">
+                        <div className="container mx-auto px-3">
+                            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                                {mobileCategories.map((category) => (
+                                    <Link
+                                        key={category.id}
+                                        href={`/categories/${category.slug}?vertical=daily_fresh`}
+                                        className="w-22 shrink-0 rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm"
+                                    >
+                                        <img
+                                            src={getSafeUrl(category.image)}
+                                            alt={category.name}
+                                            className="mx-auto h-11 w-11 rounded-lg object-cover"
+                                            loading="lazy"
+                                            onError={(event) => {
+                                                (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                            }}
+                                        />
+                                        <p className="mt-1.5 line-clamp-2 text-[11px] leading-tight font-medium text-gray-700">{category.name}</p>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 <HeroBanner banners={banners} autoPlay={true} interval={5000} />
 
@@ -328,6 +345,33 @@ export default function Home({ banners, categories, products = [], subscriptionP
         <UserLayout>
             <Head title="FreshTick - Fresh Dairy Delivered Daily" />
 
+            {mobileCategories.length > 0 && (
+                <section className="bg-white py-2 lg:hidden">
+                    <div className="container mx-auto px-3">
+                        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                            {mobileCategories.map((category) => (
+                                <Link
+                                    key={category.id}
+                                    href={`/categories/${category.slug}?vertical=society_fresh`}
+                                    className="w-22 shrink-0 rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm"
+                                >
+                                    <img
+                                        src={getSafeUrl(category.image)}
+                                        alt={category.name}
+                                        className="mx-auto h-11 w-11 rounded-lg object-cover"
+                                        loading="lazy"
+                                        onError={(event) => {
+                                            (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                        }}
+                                    />
+                                    <p className="mt-1.5 line-clamp-2 text-[11px] leading-tight font-medium text-gray-700">{category.name}</p>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
+
             {/* Hero Banner Section - Compact with thumbnails */}
             <HeroBanner banners={banners} autoPlay={true} interval={5000} />
 
@@ -335,7 +379,7 @@ export default function Home({ banners, categories, products = [], subscriptionP
                 <SocietyDeliveryMarqueeSection />
 
                 <SocietyCategoriesSection
-                    categories={categories}
+                    categories={societyCategories}
                     categorySliderRef={categorySliderRef}
                     categoryActivePage={categoryActivePage}
                     setCategoryActivePage={setCategoryActivePage}

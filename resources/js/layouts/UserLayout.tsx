@@ -35,7 +35,7 @@ export default function UserLayout({ children, showHeader = true, showTopBanner 
 
         const handleScroll = () => {
             const scrollY = window.scrollY;
-            setIsTopBannerVisible(scrollY < 10);
+            setIsTopBannerVisible(scrollY <= 0);
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
@@ -52,8 +52,12 @@ export default function UserLayout({ children, showHeader = true, showTopBanner 
 
     return (
         <div className={`min-h-screen bg-white${navigating ? 'cursor-wait' : ''}`}>
-            {showTopBanner && <TopBanner visible={isTopBannerVisible} />}
-            {showHeader && <Header showTopBanner={isTopBannerVisible} />}
+            {showTopBanner && (
+                <div className="hidden lg:block">
+                    <TopBanner visible={isTopBannerVisible} />
+                </div>
+            )}
+            {showHeader && <Header showTopBanner={showTopBanner && isTopBannerVisible} />}
             <main>{children}</main>
             <Footer />
         </div>
