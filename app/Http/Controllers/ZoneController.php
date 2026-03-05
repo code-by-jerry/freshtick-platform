@@ -43,25 +43,15 @@ class ZoneController extends Controller
 
     public function checkServiceability(CheckServiceabilityRequest $request): JsonResponse
     {
-        $pincode = $request->validated('pincode');
+        $pincode = trim((string) ($request->validated('pincode') ?? ''));
         $lat = $request->validated('latitude');
         $lng = $request->validated('longitude');
 
-        if ($pincode !== null && $pincode !== '') {
-            $address = [
-                'pincode' => $pincode,
-                'latitude' => $lat,
-                'longitude' => $lng,
-            ];
-            $zone = $this->locationService->validateAddress($address);
-        } elseif ($lat !== null && $lng !== null) {
-            $zone = $this->locationService->findZoneByCoordinates((float) $lat, (float) $lng);
-            if ($zone !== null && ! $zone->isServiceableAtTime()) {
-                $zone = null;
-            }
-        } else {
-            $zone = null;
-        }
+        $zone = $this->locationService->validateAddress([
+            'pincode' => $pincode,
+            'latitude' => $lat !== null ? (float) $lat : null,
+            'longitude' => $lng !== null ? (float) $lng : null,
+        ], Auth::id());
 
         return response()->json([
             'serviceable' => $zone !== null,
@@ -83,22 +73,23 @@ class ZoneController extends Controller
     {
         $data = $request->validated();
         $user = $request->user();
+        $resolvedPincode = trim((string) ($data['pincode'] ?? ''));
 
-        $zone = $this->locationService->findZoneByCoordinates((float) $data['latitude'], (float) $data['longitude']);
-        if ($zone !== null && ! $zone->isServiceableAtTime()) {
-            $zone = null;
-        }
-
-        if ($zone === null) {
-            $zone = $this->locationService->validateAddress([
-                'pincode' => $data['pincode'],
-            ], $user?->id);
-        }
+        $zone = $this->locationService->validateAddress([
+            'pincode' => $resolvedPincode,
+            'latitude' => (float) $data['latitude'],
+            'longitude' => (float) $data['longitude'],
+        ], $user?->id);
 
         if ($zone === null) {
             return back()->withErrors([
                 'location' => 'Selected location is outside our delivery zones.',
             ]);
+        }
+
+        if ($resolvedPincode === '') {
+            $zonePincodes = is_array($zone->pincodes) ? $zone->pincodes : [];
+            $resolvedPincode = trim((string) ($zonePincodes[0] ?? ''));
         }
 
         if ($user) {
@@ -117,7 +108,7 @@ class ZoneController extends Controller
                 'landmark' => $data['landmark'] ?? null,
                 'city' => $data['city'],
                 'state' => $data['state'],
-                'pincode' => $data['pincode'],
+                'pincode' => $resolvedPincode,
                 'latitude' => $data['latitude'],
                 'longitude' => $data['longitude'],
                 'zone_id' => $zone->id,
@@ -138,7 +129,7 @@ class ZoneController extends Controller
                     'address_line_1' => $data['address_line_1'],
                     'city' => $data['city'],
                     'state' => $data['state'],
-                    'pincode' => $data['pincode'],
+                    'pincode' => $resolvedPincode,
                     'latitude' => $data['latitude'],
                     'longitude' => $data['longitude'],
                 ],

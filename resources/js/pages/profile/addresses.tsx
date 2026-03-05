@@ -31,13 +31,47 @@ interface AddressesPageProps {
 }
 
 interface AddressSearchResult {
-    placeId: string;
-    label: string;
-    lat: number;
-    lng: number;
+    id: string;
+    primaryText: string;
+    secondaryText: string;
+    prediction: PlacePredictionLike;
+}
+
+interface AddressComponentLike {
+    longText?: string;
+    long_name?: string;
+    types?: string[];
+}
+
+interface PlaceLike {
+    fetchFields: (options: { fields: string[] }) => Promise<void>;
+    location?: google.maps.LatLng | null;
+    formattedAddress?: string;
+    displayName?: string | { text?: string };
+    addressComponents?: AddressComponentLike[];
+}
+
+interface PlacePredictionLike {
+    text?: { toString: () => string };
+    placeId?: string;
+    toPlace: () => PlaceLike;
+}
+
+interface PlaceSuggestionLike {
+    placePrediction?: PlacePredictionLike;
+}
+
+interface AutocompleteSuggestionStaticLike {
+    fetchAutocompleteSuggestions: (request: Record<string, unknown>) => Promise<{ suggestions?: PlaceSuggestionLike[] }>;
+}
+
+interface PlacesLibraryLike extends google.maps.PlacesLibrary {
+    AutocompleteSuggestion?: AutocompleteSuggestionStaticLike;
+    AutocompleteSessionToken?: new () => unknown;
 }
 
 const ADDRESS_MAP_DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 };
+const GOOGLE_MAP_LIBRARIES: 'places'[] = ['places'];
 
 const emptyAddress = {
     type: 'home' as AddressType,
@@ -298,14 +332,19 @@ function AddressFormFields({
     const { isLoaded: isGoogleMapsLoaded, loadError: googleMapsLoadError } = useJsApiLoader({
         id: 'profile-addresses-google-map-script',
         googleMapsApiKey: apiKey,
+        libraries: GOOGLE_MAP_LIBRARIES,
     });
 
     const [isMapOpen, setIsMapOpen] = useState(false);
     const mapRef = useRef<google.maps.Map | null>(null);
     const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+    const placesLibraryRef = useRef<PlacesLibraryLike | null>(null);
+    const placesSessionTokenRef = useRef<unknown | null>(null);
+    const placesSearchRequestIdRef = useRef(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<AddressSearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [placesAutocompleteError, setPlacesAutocompleteError] = useState<string | null>(null);
     const [mapLocation, setMapLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
@@ -350,6 +389,42 @@ function AddressFormFields({
         [ensureMarker],
     );
 
+    const ensurePlacesLibrary = useCallback(async (): Promise<PlacesLibraryLike> => {
+        if (placesLibraryRef.current) {
+            return placesLibraryRef.current;
+        }
+
+        const placesLibrary = (await google.maps.importLibrary('places')) as PlacesLibraryLike;
+        placesLibraryRef.current = placesLibrary;
+
+        return placesLibrary;
+    }, []);
+
+    const ensurePlacesSessionToken = useCallback(async (): Promise<unknown | null> => {
+        const placesLibrary = await ensurePlacesLibrary();
+
+        if (!placesLibrary.AutocompleteSessionToken) {
+            return null;
+        }
+
+        if (placesSessionTokenRef.current === null) {
+            placesSessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+        }
+
+        return placesSessionTokenRef.current;
+    }, [ensurePlacesLibrary]);
+
+    const refreshPlacesSessionToken = useCallback(async (): Promise<void> => {
+        const placesLibrary = await ensurePlacesLibrary();
+
+        if (!placesLibrary.AutocompleteSessionToken) {
+            placesSessionTokenRef.current = null;
+            return;
+        }
+
+        placesSessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+    }, [ensurePlacesLibrary]);
+
     useEffect(() => {
         if (!isMapOpen || !isGoogleMapsLoaded || mapLocation || !navigator.geolocation) {
             return;
@@ -387,59 +462,220 @@ function AddressFormFields({
         }
     }, [mapLocation, setMarkerPosition]);
 
-    const getAddressComponent = (components: google.maps.GeocoderAddressComponent[], type: string): string => {
-        const component = components.find((addressComponent) => addressComponent.types.includes(type));
+    const getAddressComponent = (components: AddressComponentLike[], type: string): string => {
+        const component = components.find((addressComponent) => Array.isArray(addressComponent.types) && addressComponent.types.includes(type));
 
-        return component?.long_name ?? '';
+        if (!component) {
+            return '';
+        }
+
+        if (typeof component.longText === 'string' && component.longText.trim() !== '') {
+            return component.longText;
+        }
+
+        if (typeof component.long_name === 'string' && component.long_name.trim() !== '') {
+            return component.long_name;
+        }
+
+        return '';
     };
 
-    const handleSearchLocation = async (): Promise<void> => {
-        if (!searchQuery.trim() || !isGoogleMapsLoaded || !window.google?.maps) {
+    const handleSearchLocation = useCallback(
+        async (query: string): Promise<void> => {
+            const trimmedQuery = query.trim();
+
+            if (trimmedQuery.length < 2) {
+                setSearchResults([]);
+                setIsSearching(false);
+                setPlacesAutocompleteError(null);
+                return;
+            }
+
+            if (!isGoogleMapsLoaded || !window.google?.maps) {
+                return;
+            }
+
+            const requestId = ++placesSearchRequestIdRef.current;
+
+            setToolMessage(null);
+            setIsSearching(true);
+            setSearchResults([]);
+            setPlacesAutocompleteError(null);
+
+            try {
+                const placesLibrary = await ensurePlacesLibrary();
+                const autocompleteSuggestion = placesLibrary.AutocompleteSuggestion;
+
+                if (!autocompleteSuggestion) {
+                    throw new Error('AutocompleteSuggestion API unavailable');
+                }
+
+                const sessionToken = await ensurePlacesSessionToken();
+                const mapCenter = mapRef.current?.getCenter();
+
+                const buildRequest = (options: { withIndiaHint: boolean; withMapBias: boolean }): Record<string, unknown> => {
+                    const request: Record<string, unknown> = {
+                        input: trimmedQuery,
+                        language: 'en-US',
+                    };
+
+                    if (sessionToken !== null) {
+                        request.sessionToken = sessionToken;
+                    }
+
+                    if (options.withIndiaHint) {
+                        request.includedRegionCodes = ['in'];
+                        request.region = 'in';
+                    }
+
+                    if (mapCenter) {
+                        const center = {
+                            lat: mapCenter.lat(),
+                            lng: mapCenter.lng(),
+                        };
+
+                        request.origin = center;
+
+                        if (options.withMapBias) {
+                            request.locationBias = {
+                                center,
+                                radius: 50000,
+                            };
+                        }
+                    }
+
+                    return request;
+                };
+
+                const mapSuggestionsToResults = (suggestions?: PlaceSuggestionLike[]): AddressSearchResult[] => {
+                    return (Array.isArray(suggestions) ? suggestions : [])
+                        .map((suggestion, index) => {
+                            const prediction = suggestion.placePrediction;
+                            if (!prediction) {
+                                return null;
+                            }
+
+                            const label = prediction.text?.toString().trim() ?? '';
+                            if (label === '') {
+                                return null;
+                            }
+
+                            const [primaryText, ...secondaryParts] = label.split(',');
+
+                            return {
+                                id: prediction.placeId ?? `${label}-${index}`,
+                                primaryText: primaryText.trim(),
+                                secondaryText: secondaryParts.join(',').trim(),
+                                prediction,
+                            };
+                        })
+                        .filter((result): result is AddressSearchResult => result !== null);
+                };
+
+                const primaryResponse = await autocompleteSuggestion.fetchAutocompleteSuggestions(
+                    buildRequest({ withIndiaHint: true, withMapBias: true }),
+                );
+
+                if (requestId !== placesSearchRequestIdRef.current) {
+                    return;
+                }
+
+                let nextResults = mapSuggestionsToResults(primaryResponse.suggestions);
+
+                if (nextResults.length === 0) {
+                    const fallbackResponse = await autocompleteSuggestion.fetchAutocompleteSuggestions(
+                        buildRequest({ withIndiaHint: false, withMapBias: false }),
+                    );
+
+                    if (requestId !== placesSearchRequestIdRef.current) {
+                        return;
+                    }
+
+                    nextResults = mapSuggestionsToResults(fallbackResponse.suggestions);
+                }
+
+                setSearchResults(nextResults);
+            } catch {
+                if (requestId !== placesSearchRequestIdRef.current) {
+                    return;
+                }
+
+                setSearchResults([]);
+                setPlacesAutocompleteError('Place suggestions are unavailable. Please check Places API (New).');
+            } finally {
+                if (requestId === placesSearchRequestIdRef.current) {
+                    setIsSearching(false);
+                }
+            }
+        },
+        [ensurePlacesLibrary, ensurePlacesSessionToken, isGoogleMapsLoaded],
+    );
+
+    useEffect(() => {
+        if (!isMapOpen) {
             return;
         }
 
-        setToolMessage(null);
-        setIsSearching(true);
-        setSearchResults([]);
+        const trimmedQuery = searchQuery.trim();
 
-        try {
-            const geocoder = new google.maps.Geocoder();
-            const geocodeResult = await geocoder.geocode({
-                address: searchQuery,
-                componentRestrictions: { country: 'IN' },
-            });
-
-            const results: AddressSearchResult[] = (geocodeResult.results ?? []).slice(0, 5).map((result) => {
-                const location = result.geometry.location;
-
-                return {
-                    placeId: result.place_id,
-                    label: result.formatted_address,
-                    lat: Number(location.lat().toFixed(6)),
-                    lng: Number(location.lng().toFixed(6)),
-                };
-            });
-
-            setSearchResults(results);
-        } catch (error) {
-            console.error('Error fetching location:', error);
+        if (trimmedQuery.length < 2) {
             setSearchResults([]);
-        } finally {
             setIsSearching(false);
+            setPlacesAutocompleteError(null);
+            return;
         }
-    };
 
-    const handleSelectSearchResult = (result: AddressSearchResult): void => {
-        setToolMessage(null);
-        setMapLocation({ lat: result.lat, lng: result.lng });
-        setSearchQuery(result.label);
-        setSearchResults([]);
+        const timer = window.setTimeout(() => {
+            void handleSearchLocation(trimmedQuery);
+        }, 300);
 
-        if (mapRef.current) {
-            mapRef.current.setCenter({ lat: result.lat, lng: result.lng });
-            mapRef.current.setZoom(15);
-        }
-    };
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [handleSearchLocation, isMapOpen, searchQuery]);
+
+    const handleSelectSearchResult = useCallback(
+        async (result: AddressSearchResult): Promise<void> => {
+            setToolMessage(null);
+            setPlacesAutocompleteError(null);
+
+            try {
+                const place = result.prediction.toPlace();
+                await place.fetchFields({
+                    fields: ['formattedAddress', 'location', 'displayName', 'addressComponents'],
+                });
+
+                const placeDisplayName = typeof place.displayName === 'string' ? place.displayName : place.displayName?.text;
+                const selectedLabel =
+                    place.formattedAddress ??
+                    placeDisplayName ??
+                    `${result.primaryText}${result.secondaryText !== '' ? `, ${result.secondaryText}` : ''}`;
+
+                if (!place.location) {
+                    setToolMessage('Could not resolve selected place coordinates.');
+                    return;
+                }
+
+                const lat = Number(place.location.lat().toFixed(6));
+                const lng = Number(place.location.lng().toFixed(6));
+
+                setMapLocation({ lat, lng });
+                setSearchQuery(selectedLabel);
+                setSearchResults([]);
+
+                if (mapRef.current) {
+                    mapRef.current.setCenter({ lat, lng });
+                    mapRef.current.setZoom(15);
+                }
+
+                await setMarkerPosition(lat, lng);
+                await refreshPlacesSessionToken();
+            } catch {
+                setToolMessage('Unable to load selected place details. Please try another suggestion.');
+            }
+        },
+        [refreshPlacesSessionToken, setMarkerPosition],
+    );
 
     const handleGoogleMapClick = (event: google.maps.MapMouseEvent): void => {
         if (!event.latLng) {
@@ -492,6 +728,7 @@ function AddressFormFields({
         setMapLocation(null);
         setSearchResults([]);
         setSearchQuery('');
+        setPlacesAutocompleteError(null);
 
         if (markerRef.current) {
             markerRef.current.map = null;
@@ -585,20 +822,22 @@ function AddressFormFields({
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            void handleSearchLocation();
+                                            void handleSearchLocation(searchQuery);
                                         }
                                     }}
                                 />
                             </div>
                             <button
                                 type="button"
-                                onClick={() => void handleSearchLocation()}
-                                disabled={isSearching || !searchQuery.trim() || !isGoogleMapsLoaded}
+                                onClick={() => void handleSearchLocation(searchQuery)}
+                                disabled={isSearching || searchQuery.trim().length < 2 || !isGoogleMapsLoaded}
                                 className="shrink-0 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-black disabled:opacity-50"
                             >
                                 {isSearching ? '...' : 'Search'}
                             </button>
                         </div>
+
+                        {placesAutocompleteError && <div className="mb-2 text-xs text-red-600">{placesAutocompleteError}</div>}
 
                         <div className="mb-3 flex flex-wrap gap-2">
                             <button
@@ -630,11 +869,14 @@ function AddressFormFields({
                                 <ul className="py-1">
                                     {searchResults.map((result) => (
                                         <li
-                                            key={`${result.placeId}-${result.lat}-${result.lng}`}
-                                            onClick={() => handleSelectSearchResult(result)}
+                                            key={result.id}
+                                            onClick={() => void handleSelectSearchResult(result)}
                                             className="cursor-pointer border-b border-gray-50 py-2 pr-4 pl-3 text-xs text-gray-800 last:border-0 hover:bg-gray-50 hover:text-(--theme-primary-1)"
                                         >
-                                            <span className="block truncate font-medium">{result.label}</span>
+                                            <span className="block truncate font-medium">{result.primaryText}</span>
+                                            {result.secondaryText !== '' && (
+                                                <span className="block truncate text-[11px] text-gray-500">{result.secondaryText}</span>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>

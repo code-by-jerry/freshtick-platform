@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BusinessVertical;
+use App\Services\LocationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,18 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Zone extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        $invalidateLocationCache = static function (): void {
+            app(LocationService::class)->invalidateZoneCache();
+        };
+
+        static::saved($invalidateLocationCache);
+        static::deleted($invalidateLocationCache);
+        static::restored($invalidateLocationCache);
+        static::forceDeleted($invalidateLocationCache);
+    }
 
     protected $fillable = [
         'hub_id',
@@ -124,16 +137,19 @@ class Zone extends Model
     /**
      * Check if lat/lng is within boundary polygon. boundary_coordinates: array of [lat, lng].
      */
-    public function isWithinBoundary(float $lat, float $lng): bool
+    public function hasBoundary(): bool
     {
         $boundary = $this->boundary_coordinates;
-        if (empty($boundary) || ! is_array($boundary)) {
+
+        return is_array($boundary) && count($boundary) >= 3;
+    }
+
+    public function isWithinBoundary(float $lat, float $lng): bool
+    {
+        if (! $this->hasBoundary()) {
             return false;
         }
-        $points = array_values($boundary);
-        if (count($points) < 3) {
-            return false;
-        }
+        $points = array_values($this->boundary_coordinates);
         $polygon = array_map(function ($p) {
             if (! is_array($p)) {
                 return [0.0, 0.0];
@@ -159,6 +175,11 @@ class Zone extends Model
             $yi = $polygon[$i][1];
             $xj = $polygon[$j][0];
             $yj = $polygon[$j][1];
+
+            if ($this->pointOnSegment($x, $y, $xi, $yi, $xj, $yj)) {
+                return true;
+            }
+
             if ((($yi > $y) !== ($yj > $y)) &&
                 ($x < ($xj - $xi) * ($y - $yi) / ($yj - $yi) + $xi)) {
                 $inside = ! $inside;
@@ -166,6 +187,28 @@ class Zone extends Model
         }
 
         return $inside;
+    }
+
+    protected function pointOnSegment(float $px, float $py, float $ax, float $ay, float $bx, float $by): bool
+    {
+        $epsilon = 0.000000001;
+
+        $crossProduct = ($py - $ay) * ($bx - $ax) - ($px - $ax) * ($by - $ay);
+        if (abs($crossProduct) > $epsilon) {
+            return false;
+        }
+
+        $dotProduct = ($px - $ax) * ($bx - $ax) + ($py - $ay) * ($by - $ay);
+        if ($dotProduct < -$epsilon) {
+            return false;
+        }
+
+        $segmentLengthSquared = ($bx - $ax) * ($bx - $ax) + ($by - $ay) * ($by - $ay);
+        if ($dotProduct - $segmentLengthSquared > $epsilon) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -5,15 +5,43 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_CENTER = { lat: 10.027, lng: 76.308 };
+const GOOGLE_MAP_LIBRARIES: 'places'[] = ['places'];
 
 interface PageProps {
     googleMapsApiKey?: string | null;
 }
 
 interface SearchResult {
-    lat: number;
-    lng: number;
-    label: string;
+    id: string;
+    primaryText: string;
+    secondaryText: string;
+    prediction: PlacePredictionLike;
+}
+
+interface PlaceLike {
+    fetchFields: (options: { fields: string[] }) => Promise<void>;
+    location?: google.maps.LatLng | null;
+    formattedAddress?: string;
+    displayName?: string | { text?: string };
+}
+
+interface PlacePredictionLike {
+    text?: { toString: () => string };
+    placeId?: string;
+    toPlace: () => PlaceLike;
+}
+
+interface PlaceSuggestionLike {
+    placePrediction?: PlacePredictionLike;
+}
+
+interface AutocompleteSuggestionStaticLike {
+    fetchAutocompleteSuggestions: (request: Record<string, unknown>) => Promise<{ suggestions?: PlaceSuggestionLike[] }>;
+}
+
+interface PlacesLibraryLike extends google.maps.PlacesLibrary {
+    AutocompleteSuggestion?: AutocompleteSuggestionStaticLike;
+    AutocompleteSessionToken?: new () => unknown;
 }
 
 interface LocationMapPickerProps {
@@ -46,15 +74,20 @@ export default function LocationMapPicker({
     const { isLoaded: isGoogleMapsLoaded, loadError: googleMapsLoadError } = useJsApiLoader({
         id: 'admin-location-map-picker-google-script',
         googleMapsApiKey: apiKey,
+        libraries: GOOGLE_MAP_LIBRARIES,
     });
 
     const mapRef = useRef<google.maps.Map | null>(null);
     const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+    const placesLibraryRef = useRef<PlacesLibraryLike | null>(null);
+    const placesSessionTokenRef = useRef<unknown | null>(null);
+    const placesSearchRequestIdRef = useRef(0);
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
     const [searchQuery, setSearchQuery] = useState('');
     const [searching, setSearching] = useState(false);
     const [results, setResults] = useState<SearchResult[]>([]);
+    const [placesAutocompleteError, setPlacesAutocompleteError] = useState<string | null>(null);
     const [isLocating, setIsLocating] = useState(false);
     const [toolMessage, setToolMessage] = useState<string | null>(null);
 
@@ -98,6 +131,42 @@ export default function LocationMapPicker({
         },
         [ensureMarker],
     );
+
+    const ensurePlacesLibrary = useCallback(async (): Promise<PlacesLibraryLike> => {
+        if (placesLibraryRef.current) {
+            return placesLibraryRef.current;
+        }
+
+        const placesLibrary = (await google.maps.importLibrary('places')) as PlacesLibraryLike;
+        placesLibraryRef.current = placesLibrary;
+
+        return placesLibrary;
+    }, []);
+
+    const ensurePlacesSessionToken = useCallback(async (): Promise<unknown | null> => {
+        const placesLibrary = await ensurePlacesLibrary();
+
+        if (!placesLibrary.AutocompleteSessionToken) {
+            return null;
+        }
+
+        if (placesSessionTokenRef.current === null) {
+            placesSessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+        }
+
+        return placesSessionTokenRef.current;
+    }, [ensurePlacesLibrary]);
+
+    const refreshPlacesSessionToken = useCallback(async (): Promise<void> => {
+        const placesLibrary = await ensurePlacesLibrary();
+
+        if (!placesLibrary.AutocompleteSessionToken) {
+            placesSessionTokenRef.current = null;
+            return;
+        }
+
+        placesSessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+    }, [ensurePlacesLibrary]);
 
     useEffect(() => {
         if (!apiKey || googleMapsLoadError) {
@@ -191,54 +260,200 @@ export default function LocationMapPicker({
         onLocationClear?.();
     }, [onLocationClear]);
 
-    const handleSearch = useCallback(async (): Promise<void> => {
-        if (!searchQuery.trim() || !isGoogleMapsLoaded || !window.google?.maps) {
+    const handleSearch = useCallback(
+        async (query: string): Promise<void> => {
+            const trimmedQuery = query.trim();
+
+            if (trimmedQuery.length < 2) {
+                setResults([]);
+                setSearching(false);
+                setPlacesAutocompleteError(null);
+                return;
+            }
+
+            if (!isGoogleMapsLoaded || !window.google?.maps) {
+                return;
+            }
+
+            const requestId = ++placesSearchRequestIdRef.current;
+
+            setSearching(true);
+            setResults([]);
+            setPlacesAutocompleteError(null);
+
+            try {
+                const placesLibrary = await ensurePlacesLibrary();
+                const autocompleteSuggestion = placesLibrary.AutocompleteSuggestion;
+
+                if (!autocompleteSuggestion) {
+                    throw new Error('AutocompleteSuggestion API unavailable');
+                }
+
+                const sessionToken = await ensurePlacesSessionToken();
+                const mapCenter = mapRef.current?.getCenter();
+
+                const buildRequest = (options: { withIndiaHint: boolean; withMapBias: boolean }): Record<string, unknown> => {
+                    const request: Record<string, unknown> = {
+                        input: trimmedQuery,
+                        language: 'en-US',
+                    };
+
+                    if (sessionToken !== null) {
+                        request.sessionToken = sessionToken;
+                    }
+
+                    if (options.withIndiaHint) {
+                        request.includedRegionCodes = ['in'];
+                        request.region = 'in';
+                    }
+
+                    if (mapCenter) {
+                        const center = {
+                            lat: mapCenter.lat(),
+                            lng: mapCenter.lng(),
+                        };
+
+                        request.origin = center;
+
+                        if (options.withMapBias) {
+                            request.locationBias = {
+                                center,
+                                radius: 50000,
+                            };
+                        }
+                    }
+
+                    return request;
+                };
+
+                const mapSuggestionsToResults = (suggestions?: PlaceSuggestionLike[]): SearchResult[] => {
+                    return (Array.isArray(suggestions) ? suggestions : [])
+                        .map((suggestion, index) => {
+                            const prediction = suggestion.placePrediction;
+                            if (!prediction) {
+                                return null;
+                            }
+
+                            const label = prediction.text?.toString().trim() ?? '';
+                            if (label === '') {
+                                return null;
+                            }
+
+                            const [primaryText, ...secondaryParts] = label.split(',');
+
+                            return {
+                                id: prediction.placeId ?? `${label}-${index}`,
+                                primaryText: primaryText.trim(),
+                                secondaryText: secondaryParts.join(',').trim(),
+                                prediction,
+                            };
+                        })
+                        .filter((result): result is SearchResult => result !== null);
+                };
+
+                const primaryResponse = await autocompleteSuggestion.fetchAutocompleteSuggestions(
+                    buildRequest({ withIndiaHint: true, withMapBias: true }),
+                );
+
+                if (requestId !== placesSearchRequestIdRef.current) {
+                    return;
+                }
+
+                let nextResults = mapSuggestionsToResults(primaryResponse.suggestions);
+
+                if (nextResults.length === 0) {
+                    const fallbackResponse = await autocompleteSuggestion.fetchAutocompleteSuggestions(
+                        buildRequest({ withIndiaHint: false, withMapBias: false }),
+                    );
+
+                    if (requestId !== placesSearchRequestIdRef.current) {
+                        return;
+                    }
+
+                    nextResults = mapSuggestionsToResults(fallbackResponse.suggestions);
+                }
+
+                setResults(nextResults);
+            } catch {
+                if (requestId !== placesSearchRequestIdRef.current) {
+                    return;
+                }
+
+                setResults([]);
+                setPlacesAutocompleteError('Place suggestions are unavailable. Please check Places API (New).');
+            } finally {
+                if (requestId === placesSearchRequestIdRef.current) {
+                    setSearching(false);
+                }
+            }
+        },
+        [ensurePlacesLibrary, ensurePlacesSessionToken, isGoogleMapsLoaded],
+    );
+
+    useEffect(() => {
+        const trimmedQuery = searchQuery.trim();
+
+        if (trimmedQuery.length < 2) {
+            setResults([]);
+            setSearching(false);
+            setPlacesAutocompleteError(null);
             return;
         }
 
-        setSearching(true);
-        setResults([]);
+        const timer = window.setTimeout(() => {
+            void handleSearch(trimmedQuery);
+        }, 300);
 
-        try {
-            const geocoder = new google.maps.Geocoder();
-            const geocodeResult = await geocoder.geocode({
-                address: searchQuery,
-            });
-
-            const nextResults: SearchResult[] = (geocodeResult.results ?? []).slice(0, 5).map((result) => {
-                const location = result.geometry.location;
-
-                return {
-                    lat: Number(location.lat().toFixed(6)),
-                    lng: Number(location.lng().toFixed(6)),
-                    label: result.formatted_address,
-                };
-            });
-
-            setResults(nextResults);
-        } catch {
-            setResults([]);
-        } finally {
-            setSearching(false);
-        }
-    }, [isGoogleMapsLoaded, searchQuery]);
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [handleSearch, searchQuery]);
 
     const focusResult = useCallback(
-        (result: SearchResult): void => {
+        async (result: SearchResult): Promise<void> => {
             if (!mapRef.current) {
                 return;
             }
 
-            mapRef.current.setCenter({ lat: result.lat, lng: result.lng });
-            const currentZoom = mapRef.current.getZoom() ?? 12;
-            mapRef.current.setZoom(Math.max(currentZoom, 15));
-            void setMarkerPosition(result.lat, result.lng);
+            setToolMessage(null);
+            setPlacesAutocompleteError(null);
 
-            onLocationSelect(Number(result.lat.toFixed(6)), Number(result.lng.toFixed(6)), result.label);
-            setResults([]);
-            setSearchQuery(result.label);
+            try {
+                const place = result.prediction.toPlace();
+                await place.fetchFields({
+                    fields: ['formattedAddress', 'location', 'displayName'],
+                });
+
+                const placeDisplayName = typeof place.displayName === 'string' ? place.displayName : place.displayName?.text;
+                const selectedLabel =
+                    place.formattedAddress ??
+                    placeDisplayName ??
+                    `${result.primaryText}${result.secondaryText !== '' ? `, ${result.secondaryText}` : ''}`;
+
+                if (!place.location) {
+                    setToolMessage('Could not resolve selected place coordinates.');
+                    return;
+                }
+
+                const lat = Number(place.location.lat().toFixed(6));
+                const lng = Number(place.location.lng().toFixed(6));
+
+                mapRef.current.setCenter({ lat, lng });
+                const currentZoom = mapRef.current.getZoom() ?? 12;
+                mapRef.current.setZoom(Math.max(currentZoom, 15));
+                void setMarkerPosition(lat, lng);
+
+                onLocationSelect(lat, lng, selectedLabel);
+
+                await refreshPlacesSessionToken();
+
+                setResults([]);
+                setSearchQuery(selectedLabel);
+            } catch {
+                setToolMessage('Unable to load selected place details. Please try another suggestion.');
+            }
         },
-        [onLocationSelect, setMarkerPosition],
+        [onLocationSelect, refreshPlacesSessionToken, setMarkerPosition],
     );
 
     const handleMapLoad = useCallback(
@@ -280,7 +495,7 @@ export default function LocationMapPicker({
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                             event.preventDefault();
-                            void handleSearch();
+                            void handleSearch(searchQuery);
                         }
                     }}
                     placeholder="Search a place to drop pin..."
@@ -288,8 +503,8 @@ export default function LocationMapPicker({
                 />
                 <button
                     type="button"
-                    disabled={searching}
-                    onClick={() => void handleSearch()}
+                    disabled={searching || searchQuery.trim().length < 2 || !isGoogleMapsLoaded}
+                    onClick={() => void handleSearch(searchQuery)}
                     className="flex shrink-0 items-center gap-2 rounded-lg bg-(--admin-dark-primary) px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-70"
                 >
                     <Search className="h-4 w-4" />
@@ -301,16 +516,19 @@ export default function LocationMapPicker({
                 <div className="relative z-9999 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 text-sm shadow-sm">
                     {results.map((result) => (
                         <button
-                            key={`${result.lat}-${result.lng}-${result.label}`}
+                            key={result.id}
                             type="button"
-                            onClick={() => focusResult(result)}
+                            onClick={() => void focusResult(result)}
                             className="block w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-left leading-snug transition-colors hover:bg-gray-100"
                         >
-                            {result.label}
+                            <span className="block font-medium text-gray-800">{result.primaryText}</span>
+                            {result.secondaryText !== '' && <span className="block text-xs text-gray-500">{result.secondaryText}</span>}
                         </button>
                     ))}
                 </div>
             )}
+
+            {placesAutocompleteError && <div className="text-xs text-red-600">{placesAutocompleteError}</div>}
 
             <div className="flex flex-wrap gap-2">
                 <button

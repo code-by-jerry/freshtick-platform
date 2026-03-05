@@ -13,17 +13,19 @@ class LocationService
 {
     private const CACHE_TTL_SECONDS = 3600;
 
-    private const CACHE_KEY_ZONE_PINCODE = 'location:zone:pincode:%s';
+    private const CACHE_KEY_VERSION = 'location:zones:cache-version';
 
-    private const CACHE_KEY_ZONE_COORDS = 'location:zone:coords:%s';
+    private const CACHE_KEY_ZONE_PINCODE = 'location:v%s:zone:pincode:%s';
 
-    private const CACHE_KEY_SERVICEABLE_ZONES = 'location:zones:serviceable';
+    private const CACHE_KEY_ZONE_COORDS = 'location:v%s:zone:coords:%s';
+
+    private const CACHE_KEY_SERVICEABLE_ZONES = 'location:v%s:zones:serviceable';
 
     /**
      * Validate address against zones; return zone if serviceable, null otherwise.
      * Checks zone overrides first when user_id or address (with id) is provided.
      *
-     * @param  UserAddress|array{pincode: string, latitude?: float|null, longitude?: float|null}  $address
+     * @param  UserAddress|array{pincode?: string|null, latitude?: float|null, longitude?: float|null}  $address
      */
     public function validateAddress(UserAddress|array $address, ?int $userId = null): ?Zone
     {
@@ -34,8 +36,8 @@ class LocationService
         }
 
         $pincode = $address instanceof UserAddress
-            ? $address->pincode
-            : ($address['pincode'] ?? '');
+            ? trim((string) $address->pincode)
+            : trim((string) ($address['pincode'] ?? ''));
         $lat = $address instanceof UserAddress
             ? ($address->latitude ? (float) $address->latitude : null)
             : (isset($address['latitude']) ? (float) $address['latitude'] : null);
@@ -43,18 +45,44 @@ class LocationService
             ? ($address->longitude ? (float) $address->longitude : null)
             : (isset($address['longitude']) ? (float) $address['longitude'] : null);
 
-        $zone = $this->findZoneByPincode($pincode);
+        $zone = null;
+
+        if ($lat !== null && $lng !== null) {
+            $zone = $this->findZoneByCoordinates($lat, $lng);
+        }
+
+        if ($zone === null && $pincode !== '') {
+            $zone = $this->findZoneByPincode($pincode);
+
+            if ($zone !== null && $lat !== null && $lng !== null && $zone->hasBoundary() && ! $zone->isWithinBoundary($lat, $lng)) {
+                return null;
+            }
+        }
+
         if ($zone === null) {
             return null;
         }
-        if ($lat !== null && $lng !== null && ! $zone->isWithinBoundary($lat, $lng)) {
+
+        if (! $zone->isServiceableOnDay(now()->dayOfWeek)) {
             return null;
         }
+
         if (! $zone->isServiceableAtTime()) {
             return null;
         }
 
         return $zone;
+    }
+
+    public function invalidateZoneCache(): void
+    {
+        $currentVersion = (int) Cache::get(self::CACHE_KEY_VERSION, 1);
+        Cache::forever(self::CACHE_KEY_VERSION, $currentVersion + 1);
+    }
+
+    private function cacheVersion(): int
+    {
+        return (int) Cache::get(self::CACHE_KEY_VERSION, 1);
     }
 
     /**
@@ -89,7 +117,7 @@ class LocationService
             return null;
         }
 
-        $key = sprintf(self::CACHE_KEY_ZONE_PINCODE, $normalized);
+        $key = sprintf(self::CACHE_KEY_ZONE_PINCODE, $this->cacheVersion(), $normalized);
 
         return Cache::remember($key, self::CACHE_TTL_SECONDS, function () use ($normalized) {
             return Zone::query()
@@ -101,7 +129,7 @@ class LocationService
 
     public function findZoneByCoordinates(float $lat, float $lng): ?Zone
     {
-        $key = sprintf(self::CACHE_KEY_ZONE_COORDS, number_format($lat, 5).'_'.number_format($lng, 5));
+        $key = sprintf(self::CACHE_KEY_ZONE_COORDS, $this->cacheVersion(), number_format($lat, 5).'_'.number_format($lng, 5));
 
         return Cache::remember($key, self::CACHE_TTL_SECONDS, function () use ($lat, $lng) {
             return Zone::query()
@@ -112,7 +140,7 @@ class LocationService
     }
 
     /**
-     * @param  UserAddress|array{pincode: string, latitude?: float|null, longitude?: float|null}  $address
+     * @param  UserAddress|array{pincode?: string|null, latitude?: float|null, longitude?: float|null}  $address
      */
     public function isAddressServiceable(UserAddress|array $address): bool
     {
@@ -124,7 +152,9 @@ class LocationService
      */
     public function getServiceableZones(): Collection
     {
-        return Cache::remember(self::CACHE_KEY_SERVICEABLE_ZONES, self::CACHE_TTL_SECONDS, function () {
+        $key = sprintf(self::CACHE_KEY_SERVICEABLE_ZONES, $this->cacheVersion());
+
+        return Cache::remember($key, self::CACHE_TTL_SECONDS, function () {
             return Zone::query()->active()->orderBy('name')->get();
         });
     }
@@ -147,7 +177,7 @@ class LocationService
     /**
      * Return verticals available at the given address (from zone). Empty = none serviceable.
      *
-     * @param  UserAddress|array{pincode: string, latitude?: float|null, longitude?: float|null}  $address
+     * @param  UserAddress|array{pincode?: string|null, latitude?: float|null, longitude?: float|null}  $address
      * @return array<int, string>
      */
     public function getVerticalsForAddress(UserAddress|array $address, ?int $userId = null): array

@@ -196,6 +196,73 @@ class LocationSetTest extends TestCase
         $response->assertJsonPath('zone', null);
     }
 
+    public function test_check_serviceability_prefers_coordinates_when_pincode_does_not_match(): void
+    {
+        $zone = Zone::factory()->create([
+            'is_active' => true,
+            'pincodes' => ['682001'],
+            'boundary_coordinates' => [
+                [10.0800, 76.2000],
+                [10.0900, 76.2000],
+                [10.0900, 76.2100],
+                [10.0800, 76.2100],
+            ],
+            'service_time_start' => null,
+            'service_time_end' => null,
+        ]);
+
+        $response = $this->postJson(route('location.check-serviceability'), [
+            'pincode' => '999999',
+            'latitude' => 10.0850,
+            'longitude' => 76.2050,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('serviceable', true);
+        $response->assertJsonPath('zone.id', $zone->id);
+    }
+
+    public function test_check_serviceability_uses_latest_boundary_after_zone_update(): void
+    {
+        $zone = Zone::factory()->create([
+            'is_active' => true,
+            'boundary_coordinates' => [
+                [10.0800, 76.2000],
+                [10.0900, 76.2000],
+                [10.0900, 76.2100],
+                [10.0800, 76.2100],
+            ],
+            'service_time_start' => null,
+            'service_time_end' => null,
+        ]);
+
+        $initialResponse = $this->postJson(route('location.check-serviceability'), [
+            'latitude' => 10.0850,
+            'longitude' => 76.2050,
+        ]);
+
+        $initialResponse->assertOk();
+        $initialResponse->assertJsonPath('serviceable', true);
+
+        $zone->update([
+            'boundary_coordinates' => [
+                [11.0000, 77.0000],
+                [11.0100, 77.0000],
+                [11.0100, 77.0100],
+                [11.0000, 77.0100],
+            ],
+        ]);
+
+        $afterUpdateResponse = $this->postJson(route('location.check-serviceability'), [
+            'latitude' => 10.0850,
+            'longitude' => 76.2050,
+        ]);
+
+        $afterUpdateResponse->assertOk();
+        $afterUpdateResponse->assertJsonPath('serviceable', false);
+        $afterUpdateResponse->assertJsonPath('zone', null);
+    }
+
     public function test_setting_location_from_navbar_redirects_back(): void
     {
         $user = User::factory()->create();
@@ -220,6 +287,44 @@ class LocationSetTest extends TestCase
 
         $response->assertRedirect(route('home'));
         $response->assertSessionHas('message', 'Delivery location updated.');
+    }
+
+    public function test_setting_location_without_pincode_uses_zone_pincode_from_coordinates(): void
+    {
+        $user = User::factory()->create();
+        $zone = Zone::factory()->create([
+            'is_active' => true,
+            'pincodes' => ['682502'],
+            'boundary_coordinates' => [
+                [10.0800, 76.2000],
+                [10.0900, 76.2000],
+                [10.0900, 76.2100],
+                [10.0800, 76.2100],
+            ],
+            'service_time_start' => null,
+            'service_time_end' => null,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('location.set'), [
+            'type' => UserAddress::TYPE_HOME,
+            'label' => 'Selected location',
+            'address_line_1' => 'Vypin',
+            'city' => 'Kochi',
+            'state' => 'Kerala',
+            'pincode' => '',
+            'latitude' => 10.0850,
+            'longitude' => 76.2050,
+        ]);
+
+        $response->assertRedirect(route('catalog.home'));
+        $response->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('user_addresses', [
+            'user_id' => $user->id,
+            'zone_id' => $zone->id,
+            'pincode' => '682502',
+            'is_default' => true,
+        ]);
     }
 
     public function test_authenticated_user_can_fetch_saved_addresses_for_location_picker(): void

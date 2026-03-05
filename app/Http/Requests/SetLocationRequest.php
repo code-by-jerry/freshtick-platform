@@ -27,7 +27,7 @@ class SetLocationRequest extends FormRequest
             'landmark' => ['nullable', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:100'],
             'state' => ['required', 'string', 'max:100'],
-            'pincode' => ['required', 'string', 'max:20'],
+            'pincode' => ['nullable', 'string', 'max:20'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ];
@@ -42,7 +42,6 @@ class SetLocationRequest extends FormRequest
             'address_line_1.required' => 'Please select a valid location on the map.',
             'city.required' => 'City is required for delivery.',
             'state.required' => 'State is required for delivery.',
-            'pincode.required' => 'Pincode is required for delivery.',
             'latitude.required' => 'Please pick your location on the map.',
             'longitude.required' => 'Please pick your location on the map.',
         ];
