@@ -58,8 +58,10 @@ export default function UserLayout({ children, showHeader = true, showTopBanner 
                 </div>
             )}
             {showHeader && <Header showTopBanner={showTopBanner && isTopBannerVisible} />}
-            <main>{children}</main>
-            <Footer />
+            <main className="pb-24 lg:pb-0">{children}</main>
+            <div className="hidden lg:block">
+                <Footer />
+            </div>
         </div>
     );
 }

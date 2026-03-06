@@ -41,7 +41,7 @@ export default function SocietyCategoriesSection({
     };
 
     return (
-        <section className="bg-white py-10 sm:py-12 lg:py-14" aria-labelledby="trending-categories-heading">
+        <section className="hidden bg-white py-10 sm:py-12 lg:block lg:py-14" aria-labelledby="trending-categories-heading">
             <div className="container mx-auto px-3 sm:px-4 lg:px-6">
                 <div className="mb-6 flex items-center justify-between sm:mb-5">
                     <div className="flex items-center gap-2">

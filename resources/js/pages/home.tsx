@@ -310,23 +310,24 @@ export default function Home({ banners, categories, products = [], subscriptionP
                 {mobileCategories.length > 0 && (
                     <section className="bg-white py-2 lg:hidden">
                         <div className="container mx-auto px-3">
+                            <h2 className="mb-2 text-base font-bold text-gray-900">Shop by Category</h2>
                             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
                                 {mobileCategories.map((category) => (
                                     <Link
                                         key={category.id}
                                         href={`/categories/${category.slug}?vertical=daily_fresh`}
-                                        className="w-22 shrink-0 rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm"
+                                        className="w-22 shrink-0 rounded-xl p-1.5 text-center"
                                     >
                                         <img
                                             src={getSafeUrl(category.image)}
                                             alt={category.name}
-                                            className="mx-auto h-11 w-11 rounded-lg object-cover"
+                                            className="mx-auto h-14 w-14 rounded-lg object-cover"
                                             loading="lazy"
                                             onError={(event) => {
                                                 (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
                                             }}
                                         />
-                                        <p className="mt-1.5 line-clamp-2 text-[11px] leading-tight font-medium text-gray-700">{category.name}</p>
+                                        <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-medium text-gray-800">{category.name}</p>
                                     </Link>
                                 ))}
                             </div>
@@ -348,23 +349,24 @@ export default function Home({ banners, categories, products = [], subscriptionP
             {mobileCategories.length > 0 && (
                 <section className="bg-white py-2 lg:hidden">
                     <div className="container mx-auto px-3">
+                        <h2 className="mb-2 text-base font-bold text-gray-900">Shop by Category</h2>
                         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
                             {mobileCategories.map((category) => (
                                 <Link
                                     key={category.id}
                                     href={`/categories/${category.slug}?vertical=society_fresh`}
-                                    className="w-22 shrink-0 rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm"
+                                    className="w-22 shrink-0 rounded-xl p-1.5 text-center"
                                 >
                                     <img
                                         src={getSafeUrl(category.image)}
                                         alt={category.name}
-                                        className="mx-auto h-11 w-11 rounded-lg object-cover"
+                                        className="mx-auto h-14 w-14 rounded-lg object-cover"
                                         loading="lazy"
                                         onError={(event) => {
                                             (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
                                         }}
                                     />
-                                    <p className="mt-1.5 line-clamp-2 text-[11px] leading-tight font-medium text-gray-700">{category.name}</p>
+                                    <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-medium text-gray-800">{category.name}</p>
                                 </Link>
                             ))}
                         </div>

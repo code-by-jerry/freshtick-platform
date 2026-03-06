@@ -2,7 +2,7 @@ import { MapPin, MapPinned } from 'lucide-react';
 
 export default function SocietyDeliveryMarqueeSection() {
     return (
-        <section className="marquee-dark mt-0 overflow-hidden border-y border-gray-700/50 py-2 sm:py-2.5">
+        <section className="marquee-dark mt-0 hidden overflow-hidden border-y border-gray-700/50 py-2 sm:py-2.5 lg:block">
             <div className="flex items-center overflow-hidden">
                 <div className="animate-marquee-slow flex flex-1 items-center whitespace-nowrap">
                     {[...Array(3)].map((_, copyIndex) => (

@@ -55,7 +55,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
     return (
         <section className="relative w-full pt-0 sm:pt-0 lg:pt-23">
             {/* Mobile: Simple auto-height banner without thumbnails */}
-            <div className="h-auto w-full lg:hidden">
+            <div className="h-auto w-full px-1 lg:hidden">
                 <div
                     className="relative h-full w-full overflow-hidden"
                     onMouseEnter={() => setIsPaused(true)}
@@ -73,7 +73,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                                     <img
                                         src={banner.mobile_image || banner.image}
                                         alt={banner.title || 'Banner'}
-                                        className="h-auto w-full object-cover"
+                                        className="h-auto w-full rounded-xl object-cover"
                                         loading={index === 0 ? 'eager' : 'lazy'}
                                     />
                                 </Link>
@@ -81,7 +81,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                                 <img
                                     src={banner.mobile_image || banner.image}
                                     alt={banner.title || 'Banner'}
-                                    className="h-auto w-full object-cover"
+                                    className="h-auto w-full rounded-xl object-cover"
                                     loading={index === 0 ? 'eager' : 'lazy'}
                                 />
                             )}
@@ -107,7 +107,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
             </div>
 
             {/* Desktop: Full width with auto height and thumbnails on image */}
-            <div className="hidden w-full lg:block">
+            <div className="hidden w-full px-1 lg:block">
                 <div className="relative w-full overflow-hidden" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
                     {displayBanners.map((banner, index) => (
                         <div
@@ -119,7 +119,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                                     <img
                                         src={banner.image}
                                         alt={banner.title || 'Banner'}
-                                        className="h-auto w-full object-contain"
+                                        className="h-auto w-full rounded-xl object-contain"
                                         loading={index === 0 ? 'eager' : 'lazy'}
                                     />
                                 </Link>
@@ -127,7 +127,7 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                                 <img
                                     src={banner.image}
                                     alt={banner.title || 'Banner'}
-                                    className="h-auto w-full object-contain"
+                                    className="h-auto w-full rounded-xl object-contain"
                                     loading={index === 0 ? 'eager' : 'lazy'}
                                 />
                             )}

@@ -74,9 +74,18 @@ export default function Header({ showTopBanner }: HeaderProps) {
     const locationDisplay =
         compactAddress !== '' ? `${compactAddress}${addressWords.length > 3 ? '…' : ''}` : location?.city || zone?.name || 'Select location';
     const [currentPath, currentQuery = ''] = url.split('?');
+    const isHomePage = currentPath === '/';
     const urlVertical = getVerticalFromQuery(currentQuery);
     const [activeVertical, setActiveVertical] = useState<StrictVertical>(urlVertical);
     const mobileHeaderTitle = 'High Quality, Freshness';
+
+    const isPathActive = (path: string): boolean => {
+        if (path === '/') {
+            return currentPath === '/';
+        }
+
+        return currentPath === path || currentPath.startsWith(`${path}/`);
+    };
 
     const actionIconButtonClass =
         'flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-(--theme-primary-1) focus:ring-offset-2 focus:outline-none';
@@ -195,95 +204,127 @@ export default function Header({ showTopBanner }: HeaderProps) {
                     showTopBanner ? 'lg:top-8' : 'lg:top-0'
                 }`}
             >
-                <div className="bg-(--theme-primary-1-dark) px-3 py-2 text-white lg:hidden">
-                    <div
-                        className={`overflow-hidden transition-all duration-300 ease-out ${
-                            isMobileSearchPinned ? 'max-h-0 -translate-y-1 opacity-0' : 'max-h-44 translate-y-0 opacity-100'
-                        }`}
-                    >
-                        <div className="flex items-center justify-between gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setIsLocationModalOpen(true)}
-                                className="min-w-0 flex-1 text-left focus:outline-none"
-                                aria-label="Select location"
-                            >
-                                <div className="truncate text-base leading-tight font-semibold">{mobileHeaderTitle}</div>
-                                <div className="mt-0.5 flex items-center gap-1 text-xs text-white/90">
-                                    <span className="truncate">{locationDisplay}</span>
-                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 rotate-90" strokeWidth={2} />
+                <div className={`${isHomePage ? 'border-b border-white/10 bg-(--theme-primary-1-dark) px-2.5 py-1 text-white' : ''} lg:hidden`}>
+                    {isHomePage && (
+                        <div
+                            className={`overflow-hidden transition-all duration-300 ease-out ${
+                                isMobileSearchPinned ? 'max-h-0 -translate-y-1 opacity-0' : 'max-h-32 translate-y-0 opacity-100'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLocationModalOpen(true)}
+                                    className="min-w-0 flex-1 text-left focus:outline-none"
+                                    aria-label="Select location"
+                                >
+                                    <div className="truncate text-sm leading-tight font-semibold">{mobileHeaderTitle}</div>
+                                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-white/95">
+                                        <span className="truncate">{locationDisplay}</span>
+                                        <ChevronRight className="h-3.5 w-3.5 shrink-0 rotate-90" strokeWidth={2} />
+                                    </div>
+                                </button>
+
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Link
+                                        href="/wallet"
+                                        className="inline-flex items-center gap-1 rounded-2xl border border-white/50 bg-white px-2 py-0.5 text-(--theme-primary-1-dark) shadow-sm"
+                                        aria-label="Wallet"
+                                    >
+                                        <Wallet className="h-3 w-3" strokeWidth={2.2} />
+                                        <span className="text-xs font-semibold">₹0</span>
+                                    </Link>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobileMenuOpen(true)}
+                                        className="flex h-7.5 w-7.5 items-center justify-center rounded-full border border-white/60 bg-transparent text-white focus:ring-2 focus:ring-white/80 focus:ring-offset-1 focus:ring-offset-(--theme-primary-1-dark) focus:outline-none"
+                                        aria-label="Open menu"
+                                    >
+                                        <User className="h-4 w-4" strokeWidth={2} />
+                                    </button>
                                 </div>
-                            </button>
+                            </div>
 
-                            <div className="flex shrink-0 items-center gap-2">
-                                <Link
-                                    href="/wallet"
-                                    className="inline-flex items-center gap-1.5 rounded-2xl border border-white/50 bg-white px-2.5 py-1 text-(--theme-primary-1-dark) shadow-sm"
-                                    aria-label="Wallet"
-                                >
-                                    <Wallet className="h-4 w-4" strokeWidth={2.2} />
-                                    <span className="text-sm font-semibold">₹0</span>
-                                </Link>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setMobileMenuOpen(true)}
-                                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 bg-transparent text-white focus:ring-2 focus:ring-white/80 focus:ring-offset-1 focus:ring-offset-(--theme-primary-1-dark) focus:outline-none"
-                                    aria-label="Open menu"
-                                >
-                                    <User className="h-5 w-5" strokeWidth={2} />
-                                </button>
+                            <div className="mt-1.5 rounded-2xl bg-[#4dbfa6]/30 p-1">
+                                <div className="grid grid-cols-2 gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerticalToggle('daily_fresh')}
+                                        className={`relative rounded-xl px-3 py-1 text-sm font-semibold transition-colors focus:outline-none ${
+                                            activeVertical === 'daily_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#2f8f7c] shadow-sm'
+                                        }`}
+                                    >
+                                        {activeVertical === 'daily_fresh' && (
+                                            <span
+                                                className="absolute top-0 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-white/90"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                        Daily Fresh
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerticalToggle('society_fresh')}
+                                        className={`relative rounded-xl px-3 py-1 text-sm font-semibold transition-colors focus:outline-none ${
+                                            activeVertical === 'society_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#2f8f7c] shadow-sm'
+                                        }`}
+                                    >
+                                        {activeVertical === 'society_fresh' && (
+                                            <span
+                                                className="absolute top-0 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-white/90"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                        Society Fresh
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
-                        <div className="mt-3 rounded-2xl bg-[#4dbfa6]/30 p-1.5">
-                            <div className="grid grid-cols-2 gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => handleVerticalToggle('daily_fresh')}
-                                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus:outline-none ${
-                                        activeVertical === 'daily_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#4dbfa6] shadow-sm'
-                                    }`}
-                                >
-                                    Daily Fresh
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleVerticalToggle('society_fresh')}
-                                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus:outline-none ${
-                                        activeVertical === 'society_fresh' ? 'bg-[#4dbfa6] text-white' : 'bg-white text-[#4dbfa6] shadow-sm'
-                                    }`}
-                                >
-                                    Society Fresh
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    )}
 
                     <form
                         onSubmit={handleDesktopSearch}
                         className={
-                            isMobileSearchPinned
-                                ? 'fixed top-0 right-0 left-0 z-1200 bg-(--theme-primary-1-dark) px-3 py-2 shadow-md transition-all duration-300 ease-out'
-                                : 'mt-3 transition-all duration-300 ease-out'
+                            isMobileSearchPinned || !isHomePage
+                                ? 'fixed top-0 right-0 left-0 z-1200 border-b border-white/10 bg-(--theme-primary-1-dark) px-2.5 py-1.5 shadow-md transition-all duration-300 ease-out'
+                                : 'mt-2 transition-all duration-300 ease-out'
                         }
                     >
-                        <div className="relative">
-                            <Search
-                                className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-gray-700"
-                                strokeWidth={2.2}
-                            />
-                            <input
-                                type="search"
-                                value={desktopSearchQuery}
-                                onChange={(event) => setDesktopSearchQuery(event.target.value)}
-                                placeholder='Search for "Milk"'
-                                className="h-11 w-full rounded-2xl border border-white/60 bg-white py-2 pr-3 pl-11 text-base text-gray-800 outline-none placeholder:text-gray-700/80"
-                            />
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <Search
+                                    className="pointer-events-none absolute top-1/2 left-3.5 h-4.5 w-4.5 -translate-y-1/2 text-gray-600"
+                                    strokeWidth={2.2}
+                                />
+                                <input
+                                    type="search"
+                                    value={desktopSearchQuery}
+                                    onChange={(event) => setDesktopSearchQuery(event.target.value)}
+                                    placeholder='Search for "Milk"'
+                                    className="h-9 w-full rounded-2xl border border-white/70 bg-white py-2 pr-3 pl-10.5 text-base text-gray-800 outline-none placeholder:text-gray-600"
+                                />
+                            </div>
+
+                            {(isMobileSearchPinned || !isHomePage) && (
+                                <button
+                                    type="button"
+                                    onClick={() => router.visit('/wishlist')}
+                                    className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white text-(--theme-primary-1-dark) shadow-sm"
+                                    aria-label="Wishlist"
+                                >
+                                    <Heart className="h-4 w-4" strokeWidth={2} />
+                                    {wishlistCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-semibold text-white">
+                                            {wishlistCount}
+                                        </span>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     </form>
 
-                    {isMobileSearchPinned && <div className="h-15" aria-hidden="true" />}
+                    {(isMobileSearchPinned || !isHomePage) && <div className="h-13" aria-hidden="true" />}
                 </div>
 
                 <div className="container mx-auto hidden max-w-7xl px-4 sm:px-5 lg:block lg:px-6">
@@ -383,7 +424,7 @@ export default function Header({ showTopBanner }: HeaderProps) {
 
             <LocationModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} initialLocation={location} />
 
-            <div className={`fixed inset-0 z-1300 hidden lg:block ${webMenuOpen ? 'visible' : 'invisible'}`}>
+            <div className={`fixed inset-0 z-1300 ${webMenuOpen ? 'visible' : 'invisible'}`}>
                 <button
                     type="button"
                     onClick={() => setWebMenuOpen(false)}
@@ -501,6 +542,55 @@ export default function Header({ showTopBanner }: HeaderProps) {
                     </nav>
                 </aside>
             </div>
+
+            <nav className="fixed right-0 bottom-0 left-0 z-1250 border-t border-gray-200 bg-white/96 pb-[calc(env(safe-area-inset-bottom)+4px)] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+                <div className="grid grid-cols-5 px-1.5 pt-1">
+                    {[
+                        { label: 'Home', href: '/', icon: Home, active: isPathActive('/') },
+                        { label: 'Categories', href: '/catalog', icon: Grid3X3, active: isPathActive('/catalog') },
+                        { label: 'Products', href: '/products', icon: Package, active: isPathActive('/products') },
+                        { label: 'Deliveries', href: '/deliveries', icon: ClipboardList, active: isPathActive('/deliveries') },
+                    ].map((item) => {
+                        const Icon = item.icon;
+
+                        return (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={`relative flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] leading-none font-medium transition-colors focus:outline-none ${
+                                    item.active ? 'font-semibold text-(--theme-primary-1)' : 'text-gray-700'
+                                }`}
+                                aria-current={item.active ? 'page' : undefined}
+                            >
+                                {item.active && <span className="absolute top-0 h-0.5 w-7 rounded-full bg-(--theme-primary-1)" aria-hidden="true" />}
+                                <span
+                                    className={`relative flex h-6.5 w-6.5 items-center justify-center rounded-lg ${
+                                        item.active ? 'bg-(--theme-primary-1)/12' : ''
+                                    }`}
+                                >
+                                    <Icon className="h-4.5 w-4.5" strokeWidth={item.active ? 2.3 : 2} />
+                                </span>
+                                <span className="truncate">{item.label}</span>
+                            </Link>
+                        );
+                    })}
+
+                    <button
+                        type="button"
+                        onClick={() => setWebMenuOpen(true)}
+                        className={`relative flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] leading-none font-medium transition-colors focus:outline-none ${
+                            webMenuOpen ? 'font-semibold text-(--theme-primary-1)' : 'text-gray-700'
+                        }`}
+                        aria-label="Open more options"
+                    >
+                        {webMenuOpen && <span className="absolute top-0 h-0.5 w-7 rounded-full bg-(--theme-primary-1)" aria-hidden="true" />}
+                        <span className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg ${webMenuOpen ? 'bg-(--theme-primary-1)/12' : ''}`}>
+                            <Menu className="h-4.5 w-4.5" strokeWidth={webMenuOpen ? 2.3 : 2} />
+                        </span>
+                        <span>More</span>
+                    </button>
+                </div>
+            </nav>
 
             {/* Mobile drawer */}
             <div className={`fixed inset-0 z-1300 lg:hidden ${mobileMenuOpen ? 'visible' : 'invisible'}`}>
