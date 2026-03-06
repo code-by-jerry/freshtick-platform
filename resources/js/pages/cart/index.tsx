@@ -18,6 +18,11 @@ interface CartItem {
     id: number;
     product_id: number;
     product: Product;
+    variant: {
+        id: number;
+        name: string;
+        price: string;
+    } | null;
     quantity: number;
     price: string;
     subtotal: string;
@@ -243,6 +248,11 @@ export default function CartIndex({ cart, items, summary, addresses, available_c
                                                         >
                                                             {item.product.name}
                                                         </Link>
+                                                        {item.variant && (
+                                                            <p className="mt-0.5 text-[11px] font-medium text-gray-600 sm:text-xs">
+                                                                Option: {item.variant.name}
+                                                            </p>
+                                                        )}
                                                         {item.is_subscription && (
                                                             <span className="mt-1 inline-block rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
                                                                 Subscription

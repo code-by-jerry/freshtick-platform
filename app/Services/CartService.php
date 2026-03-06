@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Zone;
@@ -68,10 +69,11 @@ class CartService
         int $quantity = 1,
         ?Zone $zone = null,
         bool $isSubscription = false,
-        ?SubscriptionPlan $plan = null
+        ?SubscriptionPlan $plan = null,
+        ?ProductVariant $variant = null
     ): CartItem {
-        // Get price (zone-specific if available)
-        $price = $zone ? $product->getPriceForZone($zone) : $product->price;
+        // Variant price overrides product/zone price when selected.
+        $price = $variant ? (float) $variant->price : ($zone ? $product->getPriceForZone($zone) : $product->price);
 
         // Determine vertical
         $vertical = $product->vertical ?? 'daily_fresh';
@@ -80,10 +82,17 @@ class CartService
         }
 
         // Check for existing item
-        $existingItem = $cart->items()
+        $existingItemQuery = $cart->items()
             ->where('product_id', $product->id)
-            ->where('is_subscription', $isSubscription)
-            ->first();
+            ->where('is_subscription', $isSubscription);
+
+        if ($variant) {
+            $existingItemQuery->where('variant_id', $variant->id);
+        } else {
+            $existingItemQuery->whereNull('variant_id');
+        }
+
+        $existingItem = $existingItemQuery->first();
 
         if ($existingItem) {
             $existingItem->quantity += $quantity;
@@ -96,6 +105,7 @@ class CartService
         return CartItem::create([
             'cart_id' => $cart->id,
             'product_id' => $product->id,
+            'variant_id' => $variant?->id,
             'quantity' => $quantity,
             'price' => $price,
             'subtotal' => $price * $quantity,

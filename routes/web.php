@@ -63,6 +63,7 @@ Route::get('/', function () {
             'name' => $product->name,
             'slug' => $product->slug,
             'image' => $product->image,
+            'short_description' => $product->short_description,
             'price' => (float) $product->price,
             'compare_at_price' => $product->compare_at_price ? (float) $product->compare_at_price : null,
             'is_subscription_eligible' => (bool) $product->is_subscription_eligible,

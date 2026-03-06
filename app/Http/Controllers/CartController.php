@@ -32,7 +32,7 @@ class CartController extends Controller
         $sessionId = $request->session()->getId();
 
         $cart = $this->cartService->getOrCreateCart($user, $sessionId);
-        $cart->load(['items.product', 'items.subscriptionPlan']);
+        $cart->load(['items.product', 'items.variant', 'items.subscriptionPlan']);
 
         $summary = $this->cartService->getCartSummary($cart);
 
@@ -70,7 +70,7 @@ class CartController extends Controller
         $sessionId = $request->session()->getId();
 
         $cart = $this->cartService->getOrCreateCart($user, $sessionId);
-        $cart->load(['items.product', 'items.subscriptionPlan']);
+        $cart->load(['items.product', 'items.variant', 'items.subscriptionPlan']);
 
         return response()->json([
             'cart' => $cart,
@@ -102,6 +102,13 @@ class CartController extends Controller
         $plan = $isSubscription && isset($validated['subscription_plan_id'])
             ? SubscriptionPlan::find($validated['subscription_plan_id'])
             : null;
+        $variant = null;
+
+        if (isset($validated['variant_id'])) {
+            $variant = $product->variants()
+                ->where('is_active', true)
+                ->findOrFail($validated['variant_id']);
+        }
 
         $item = $this->cartService->addProduct(
             $cart,
@@ -109,10 +116,11 @@ class CartController extends Controller
             $validated['quantity'],
             $zone,
             $isSubscription,
-            $plan
+            $plan,
+            $variant
         );
 
-        $item->load('product');
+        $item->load(['product', 'variant']);
         $cart->refresh();
 
         if ($this->shouldReturnJson($request)) {
@@ -160,7 +168,7 @@ class CartController extends Controller
 
         $this->cartService->updateItem($cartItem, $validated['quantity']);
         $cartItem->refresh();
-        $cartItem->load('product');
+        $cartItem->load(['product', 'variant']);
 
         if (! $this->shouldReturnJson($request)) {
             return back()->with('message', 'Cart updated.');
@@ -232,7 +240,7 @@ class CartController extends Controller
         $sessionId = $request->session()->getId();
 
         $cart = $this->cartService->getOrCreateCart($user, $sessionId);
-        $cart->load(['items.product']);
+        $cart->load(['items.product', 'items.variant']);
 
         return response()->json([
             'items_count' => $cart->itemCount(),
@@ -241,6 +249,7 @@ class CartController extends Controller
                 'id' => $item->id,
                 'product_name' => $item->product->name,
                 'product_image' => $item->product->image,
+                'variant_name' => $item->variant?->name,
                 'quantity' => $item->quantity,
                 'subtotal' => $item->subtotal,
             ])->take(5),

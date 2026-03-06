@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, ExternalLink, MapPin, Mail, Phone, Play, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, Mail, Phone, Play, Plus, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import HeroBanner from '@/components/user/HeroBanner';
 import DailyHomeSections from '@/components/user/home/daily/DailyHomeSections';
@@ -23,6 +23,7 @@ interface ProductItem {
     name: string;
     slug: string;
     image: string;
+    short_description?: string | null;
     price: number;
     compare_at_price: number | null;
     is_subscription_eligible: boolean;
@@ -158,6 +159,11 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const [productActivePage, setProductActivePage] = useState(0);
     const [storiesActivePage, setStoriesActivePage] = useState(0);
     const [testimonialsActivePage, setTestimonialsActivePage] = useState(0);
+    const [mobileCardAddingProductId, setMobileCardAddingProductId] = useState<number | null>(null);
+    const [mobileOptionsProduct, setMobileOptionsProduct] = useState<ProductItem | null>(null);
+    const [mobileOptionsVariantId, setMobileOptionsVariantId] = useState<number | null>(null);
+    const [mobileOptionsQuantity, setMobileOptionsQuantity] = useState(1);
+    const [mobileOptionsDrawerOpen, setMobileOptionsDrawerOpen] = useState(false);
     const productSliderRef = useRef<HTMLDivElement>(null);
     const categorySliderRef = useRef<HTMLDivElement>(null);
     const storiesSliderRef = useRef<HTMLDivElement>(null);
@@ -220,10 +226,319 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const dailyCategories = categories.filter((category) => category.vertical === 'daily_fresh' || category.vertical === 'both');
     const societyCategories = categories.filter((category) => category.vertical === 'society_fresh' || category.vertical === 'both');
     const mobileCategories = selectedVertical === 'daily_fresh' ? dailyCategories : societyCategories;
+    const mobileShowcaseProducts = products.filter((product) => !product.is_subscription_eligible).slice(0, 12);
 
     const formatPrice = (price: number) => {
         return '₹' + price.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
+
+    const getActiveVariants = (product: ProductItem) => {
+        return product.variants.filter((variant) => variant.is_active);
+    };
+
+    const getWeightUnitLabel = (product: ProductItem) => {
+        if (product.weight && product.unit) {
+            return `${product.weight} ${product.unit}`;
+        }
+
+        if (product.unit) {
+            return product.unit;
+        }
+
+        return null;
+    };
+
+    const getMobilePackLabel = (product: ProductItem) => {
+        const activeVariants = getActiveVariants(product);
+        if (activeVariants.length > 0) {
+            const activeVariantId = getSelectedVariantId(product);
+            return activeVariants.find((variant) => variant.id === activeVariantId)?.name ?? activeVariants[0].name;
+        }
+
+        if (product.weight && product.unit) {
+            return `1 pack (${product.weight} ${product.unit})`;
+        }
+
+        if (product.unit) {
+            return `1 pack (${product.unit})`;
+        }
+
+        return '1 pack';
+    };
+
+    const closeMobileOptionsDrawer = () => {
+        setMobileOptionsDrawerOpen(false);
+
+        window.setTimeout(() => {
+            setMobileOptionsProduct(null);
+            setMobileOptionsVariantId(null);
+            setMobileOptionsQuantity(1);
+        }, 200);
+    };
+
+    const openMobileOptionsDrawer = (product: ProductItem) => {
+        const activeVariants = getActiveVariants(product);
+        const preselectedVariantId = activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : null;
+
+        setMobileOptionsProduct(product);
+        setMobileOptionsVariantId(preselectedVariantId);
+        setMobileOptionsQuantity(1);
+        setMobileOptionsDrawerOpen(false);
+
+        window.requestAnimationFrame(() => {
+            setMobileOptionsDrawerOpen(true);
+        });
+    };
+
+    const addMobileCardProductToCart = (product: ProductItem, quantity = 1, variantId?: number, shouldCloseDrawer = false) => {
+        if (mobileCardAddingProductId === product.id) {
+            return;
+        }
+
+        const payload: {
+            product_id: number;
+            quantity: number;
+            variant_id?: number;
+        } = {
+            product_id: product.id,
+            quantity,
+        };
+
+        if (variantId) {
+            payload.variant_id = variantId;
+        }
+
+        setMobileCardAddingProductId(product.id);
+
+        router.post('/cart/add', payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => {
+                setMobileCardAddingProductId((current) => (current === product.id ? null : current));
+
+                if (shouldCloseDrawer) {
+                    closeMobileOptionsDrawer();
+                }
+            },
+        });
+    };
+
+    const renderMobileOptionsDrawer = () => {
+        if (!mobileOptionsProduct) {
+            return null;
+        }
+
+        const drawerVariants = getActiveVariants(mobileOptionsProduct);
+        const selectedDrawerVariant = drawerVariants.find((variant) => variant.id === mobileOptionsVariantId) ?? null;
+        const unitPrice = selectedDrawerVariant ? selectedDrawerVariant.price : getDisplayPrice(mobileOptionsProduct);
+        const totalPrice = unitPrice * mobileOptionsQuantity;
+        const weightLabel = getWeightUnitLabel(mobileOptionsProduct);
+
+        return (
+            <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Product options">
+                <button
+                    type="button"
+                    className={`absolute inset-0 bg-black/45 transition-opacity duration-200 ${mobileOptionsDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+                    onClick={closeMobileOptionsDrawer}
+                    aria-label="Close options"
+                />
+
+                <div
+                    className={`absolute right-0 bottom-0 left-0 max-h-[82vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl transition-transform duration-200 ${
+                        mobileOptionsDrawerOpen ? 'translate-y-0' : 'translate-y-full'
+                    }`}
+                >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                            <p className="line-clamp-2 text-sm font-bold text-gray-900">{mobileOptionsProduct.name}</p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                                {mobileOptionsProduct.short_description || 'Select your preferred option and add to cart.'}
+                            </p>
+                            {weightLabel && <p className="mt-1 text-[11px] font-medium text-gray-700">{weightLabel}</p>}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={closeMobileOptionsDrawer}
+                            className="rounded-full border border-gray-200 p-1.5 text-gray-500"
+                            aria-label="Close options"
+                        >
+                            <X className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                    </div>
+
+                    {drawerVariants.length > 0 && (
+                        <div className="mb-3 space-y-2">
+                            <p className="text-xs font-semibold text-gray-700">Available options</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {drawerVariants.map((variant) => (
+                                    <button
+                                        key={variant.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setMobileOptionsVariantId(variant.id);
+                                            setSelectedVariants((prev) => ({ ...prev, [mobileOptionsProduct.id]: variant.id }));
+                                        }}
+                                        className={`rounded-lg border px-2 py-2 text-left text-xs font-semibold transition-colors ${
+                                            mobileOptionsVariantId === variant.id
+                                                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                                : 'border-gray-200 bg-white text-gray-700'
+                                        }`}
+                                    >
+                                        <p className="line-clamp-1">{variant.name}</p>
+                                        <p className="mt-0.5 text-[11px]">{formatPrice(variant.price)}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {drawerVariants.length === 0 && <p className="mb-3 text-xs text-gray-600">{getMobilePackLabel(mobileOptionsProduct)}</p>}
+
+                    <div className="mb-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-xs font-semibold text-gray-700">Quantity</p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setMobileOptionsQuantity((current) => Math.max(1, current - 1))}
+                                className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700"
+                                aria-label="Decrease quantity"
+                            >
+                                -
+                            </button>
+                            <span className="min-w-6 text-center text-sm font-semibold text-gray-900">{mobileOptionsQuantity}</span>
+                            <button
+                                type="button"
+                                onClick={() => setMobileOptionsQuantity((current) => Math.min(20, current + 1))}
+                                className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700"
+                                aria-label="Increase quantity"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            addMobileCardProductToCart(mobileOptionsProduct, mobileOptionsQuantity, mobileOptionsVariantId ?? undefined, true)
+                        }
+                        disabled={mobileCardAddingProductId === mobileOptionsProduct.id}
+                        className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                        {mobileCardAddingProductId === mobileOptionsProduct.id ? 'Adding...' : `Add to Cart • ${formatPrice(totalPrice)}`}
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderMobilePostBannerCards = () => {
+        if (mobileShowcaseProducts.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="bg-white py-3 lg:hidden">
+                <div className="container mx-auto px-3">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h2 className="text-sm font-bold text-gray-900">Top Picks</h2>
+                        <Link href={`/products?vertical=${selectedVertical}`} className="text-[11px] font-semibold text-(--theme-primary-1)">
+                            View All
+                        </Link>
+                    </div>
+
+                    <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                        {mobileShowcaseProducts.map((product) => {
+                            const displayPrice = getDisplayPrice(product);
+                            const hasDiscount = typeof product.compare_at_price === 'number' && product.compare_at_price > displayPrice;
+                            const savings = hasDiscount ? Math.round((product.compare_at_price as number) - displayPrice) : 0;
+                            const activeVariants = getActiveVariants(product);
+                            const selectedVariantId = activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : undefined;
+                            const isWishlisted = wishlistedProductIds.has(product.id);
+                            const weightLabel = getWeightUnitLabel(product);
+
+                            return (
+                                <article key={product.id} className="w-[calc(33.333%-6px)] min-w-24 shrink-0">
+                                    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xs">
+                                        <Link href={`/products/${product.slug}?vertical=${selectedVertical}`} className="block">
+                                            <img
+                                                src={getSafeUrl(product.image)}
+                                                alt={product.name}
+                                                className="h-20 w-full rounded-lg bg-gray-50 object-cover"
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                                }}
+                                            />
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleProductWishlist(product.id)}
+                                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                                            className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 shadow-sm"
+                                        >
+                                            <Heart
+                                                className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                strokeWidth={2}
+                                            />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => addMobileCardProductToCart(product, 1, selectedVariantId)}
+                                            disabled={mobileCardAddingProductId === product.id}
+                                            className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-lg border border-blue-600 bg-blue-50 text-blue-700 shadow-sm disabled:opacity-60"
+                                            aria-label="Add to cart"
+                                        >
+                                            <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-1">
+                                        <div className="flex items-center gap-1">
+                                            <span className="inline-flex rounded-md bg-green-600 px-1.5 py-0.5 text-[11px] leading-none font-bold text-white">
+                                                {formatPrice(displayPrice)}
+                                            </span>
+                                            {hasDiscount && (
+                                                <span className="text-[11px] font-medium text-gray-400 line-through">
+                                                    {formatPrice(product.compare_at_price as number)}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {hasDiscount && savings > 0 && (
+                                            <p className="mt-0.5 text-[10px] font-semibold text-green-700">₹{savings} OFF</p>
+                                        )}
+
+                                        <Link href={`/products/${product.slug}?vertical=${selectedVertical}`}>
+                                            <p className="mt-0.5 line-clamp-1 text-[11px] leading-[1.2] font-semibold text-gray-900">
+                                                {product.name}
+                                            </p>
+                                        </Link>
+                                        <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                                            {product.short_description || 'Fresh daily quality.'}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] text-gray-500">{weightLabel || getMobilePackLabel(product)}</p>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openMobileOptionsDrawer(product)}
+                                            className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700"
+                                        >
+                                            See options
+                                        </button>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
     const testimonialSliderRef = useRef<HTMLDivElement>(null);
     const storyVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -302,6 +617,37 @@ export default function Home({ banners, categories, products = [], subscriptionP
         };
     }, [storyViewerIndex]);
 
+    useEffect(() => {
+        if (!mobileOptionsProduct) {
+            return;
+        }
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [mobileOptionsProduct]);
+
+    useEffect(() => {
+        if (!mobileOptionsProduct) {
+            return;
+        }
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeMobileOptionsDrawer();
+            }
+        };
+
+        window.addEventListener('keydown', handleEscape);
+
+        return () => {
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [mobileOptionsProduct]);
+
     if (selectedVertical === 'daily_fresh') {
         return (
             <UserLayout>
@@ -337,7 +683,11 @@ export default function Home({ banners, categories, products = [], subscriptionP
 
                 <HeroBanner banners={banners} autoPlay={true} interval={5000} />
 
+                {renderMobilePostBannerCards()}
+
                 <DailyHomeSections />
+
+                {renderMobileOptionsDrawer()}
             </UserLayout>
         );
     }
@@ -376,6 +726,8 @@ export default function Home({ banners, categories, products = [], subscriptionP
 
             {/* Hero Banner Section - Compact with thumbnails */}
             <HeroBanner banners={banners} autoPlay={true} interval={5000} />
+
+            {renderMobilePostBannerCards()}
 
             <SocietyHomeSections>
                 <SocietyDeliveryMarqueeSection />
@@ -1292,6 +1644,8 @@ export default function Home({ banners, categories, products = [], subscriptionP
                     </div>
                 </section>
             </SocietyHomeSections>
+
+            {renderMobileOptionsDrawer()}
         </UserLayout>
     );
 }

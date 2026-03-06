@@ -55,6 +55,7 @@ export default function Header({ showTopBanner }: HeaderProps) {
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [desktopSearchQuery, setDesktopSearchQuery] = useState('');
     const [isMobileSearchPinned, setIsMobileSearchPinned] = useState(false);
+    const [isMobileCompactCartVisible, setIsMobileCompactCartVisible] = useState(false);
     const { url } = usePage();
 
     const pageProps = usePage().props as unknown as {
@@ -86,6 +87,7 @@ export default function Header({ showTopBanner }: HeaderProps) {
 
         return currentPath === path || currentPath.startsWith(`${path}/`);
     };
+    const shouldRenderMobileCartWidget = cartItemsCount > 0 && !isPathActive('/cart');
 
     const actionIconButtonClass =
         'flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-(--theme-primary-1) focus:ring-offset-2 focus:outline-none';
@@ -135,9 +137,15 @@ export default function Header({ showTopBanner }: HeaderProps) {
     }, [urlVertical]);
 
     useEffect(() => {
+        let lastScrollY = window.scrollY;
+
         const handleMobileScroll = () => {
+            const currentScrollY = window.scrollY;
+
             if (window.innerWidth >= 1024) {
                 setIsMobileSearchPinned(false);
+                setIsMobileCompactCartVisible(false);
+                lastScrollY = currentScrollY;
 
                 return;
             }
@@ -146,8 +154,32 @@ export default function Header({ showTopBanner }: HeaderProps) {
                 const pinThreshold = 32;
                 const unpinThreshold = 10;
 
-                return previousPinned ? window.scrollY > unpinThreshold : window.scrollY > pinThreshold;
+                return previousPinned ? currentScrollY > unpinThreshold : currentScrollY > pinThreshold;
             });
+
+            setIsMobileCompactCartVisible((previousVisible) => {
+                if (!shouldRenderMobileCartWidget || mobileMenuOpen || webMenuOpen) {
+                    return false;
+                }
+
+                if (currentScrollY < 80) {
+                    return false;
+                }
+
+                const scrollDelta = currentScrollY - lastScrollY;
+
+                if (scrollDelta > 4) {
+                    return true;
+                }
+
+                if (scrollDelta < -4) {
+                    return false;
+                }
+
+                return previousVisible;
+            });
+
+            lastScrollY = currentScrollY;
         };
 
         handleMobileScroll();
@@ -158,7 +190,7 @@ export default function Header({ showTopBanner }: HeaderProps) {
             window.removeEventListener('scroll', handleMobileScroll);
             window.removeEventListener('resize', handleMobileScroll);
         };
-    }, []);
+    }, [mobileMenuOpen, shouldRenderMobileCartWidget, webMenuOpen]);
 
     const handleLogout = () => {
         router.post('/logout');
@@ -542,6 +574,31 @@ export default function Header({ showTopBanner }: HeaderProps) {
                     </nav>
                 </aside>
             </div>
+
+            {shouldRenderMobileCartWidget && (
+                <div
+                    className={`fixed right-3 left-3 z-1260 transition-all duration-300 ease-out lg:hidden ${
+                        isMobileCompactCartVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
+                    }`}
+                    style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}
+                >
+                    <Link
+                        href="/cart"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/20 bg-(--theme-primary-1) px-3 py-2 text-white shadow-[0_14px_32px_rgba(15,118,110,0.3)]"
+                        aria-label="Open cart"
+                    >
+                        <span className="flex min-w-0 items-center gap-2">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15">
+                                <ShoppingCart className="h-4.5 w-4.5" strokeWidth={2.2} />
+                            </span>
+                            <span className="truncate text-sm font-semibold">
+                                {cartItemsCount} {cartItemsCount === 1 ? 'item in cart' : 'items in cart'}
+                            </span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-(--theme-primary-1)">View cart</span>
+                    </Link>
+                </div>
+            )}
 
             <nav className="fixed right-0 bottom-0 left-0 z-1250 border-t border-gray-200 bg-white/96 pb-[calc(env(safe-area-inset-bottom)+4px)] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
                 <div className="grid grid-cols-5 px-1.5 pt-1">

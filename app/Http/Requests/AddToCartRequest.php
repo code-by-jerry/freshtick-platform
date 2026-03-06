@@ -23,6 +23,7 @@ class AddToCartRequest extends FormRequest
     {
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
+            'variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100'],
             'is_subscription' => ['sometimes', 'boolean'],
             'subscription_plan_id' => ['required_if:is_subscription,true', 'nullable', 'integer', 'exists:subscription_plans,id'],
@@ -39,6 +40,7 @@ class AddToCartRequest extends FormRequest
         return [
             'product_id.required' => 'Please select a product.',
             'product_id.exists' => 'Selected product is not valid.',
+            'variant_id.exists' => 'Selected variant is not valid for this product.',
             'quantity.required' => 'Quantity is required.',
             'quantity.min' => 'Quantity must be at least 1.',
             'quantity.max' => 'Maximum quantity is 100.',

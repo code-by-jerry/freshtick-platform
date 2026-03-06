@@ -84,7 +84,7 @@ class OrderController extends Controller
         $sessionId = $request->session()->getId();
 
         $cart = $this->cartService->getOrCreateCart($user, $sessionId);
-        $cart->load(['items.product', 'items.subscriptionPlan']);
+        $cart->load(['items.product', 'items.variant', 'items.subscriptionPlan']);
 
         if ($cart->isEmpty()) {
             return redirect()->route('cart.show')

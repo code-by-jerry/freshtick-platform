@@ -1,18 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    ChevronLeft,
-    MapPin,
-    Calendar,
-    Clock,
-    CreditCard,
-    Truck,
-    FileText,
-    Shield,
-    CheckCircle2,
-    AlertCircle,
-    Loader2,
-    Wallet,
-} from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Clock, CreditCard, Truck, FileText, Shield, CheckCircle2, AlertCircle, Loader2, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import UserLayout from '@/layouts/UserLayout';
 
@@ -26,6 +13,11 @@ interface CartItem {
     id: number;
     product_id: number;
     product: Product;
+    variant: {
+        id: number;
+        name: string;
+        price: string;
+    } | null;
     quantity: number;
     price: string;
     subtotal: string;
@@ -126,9 +118,7 @@ export default function CheckoutIndex({
         {
             id: 'wallet',
             label: 'Pay with Wallet',
-            description: canPayWithWallet
-                ? `Balance: ₹${walletBalance.toFixed(2)}`
-                : `Insufficient balance (₹${walletBalance.toFixed(2)})`,
+            description: canPayWithWallet ? `Balance: ₹${walletBalance.toFixed(2)}` : `Insufficient balance (₹${walletBalance.toFixed(2)})`,
             icon: Wallet,
             disabled: !canPayWithWallet,
         },
@@ -145,12 +135,14 @@ export default function CheckoutIndex({
                     <nav className="mb-6 flex items-center gap-3 sm:mb-8" aria-label="Breadcrumb">
                         <Link
                             href="/cart"
-                            className="flex items-center gap-1.5 text-sm font-medium text-gray-600 transition-colors hover:text-[var(--theme-primary-1)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 rounded-lg"
+                            className="flex items-center gap-1.5 rounded-lg text-sm font-medium text-gray-600 transition-colors hover:text-[var(--theme-primary-1)] focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 focus:outline-none"
                         >
                             <ChevronLeft className="h-5 w-5 shrink-0" strokeWidth={2} />
                             <span className="hidden sm:inline">Back to Cart</span>
                         </Link>
-                        <span className="text-sm text-gray-400" aria-hidden>|</span>
+                        <span className="text-sm text-gray-400" aria-hidden>
+                            |
+                        </span>
                         <h1 className="text-lg font-bold text-gray-900 sm:text-xl">Checkout</h1>
                     </nav>
 
@@ -251,7 +243,7 @@ export default function CheckoutIndex({
 
                                     {/* Delivery Date */}
                                     <div className="mb-4">
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Select date</p>
+                                        <p className="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Select date</p>
                                         <div className="flex flex-wrap gap-2">
                                             {deliveryDates.map((d) => (
                                                 <button
@@ -265,9 +257,7 @@ export default function CheckoutIndex({
                                                     }`}
                                                 >
                                                     <span className="text-sm font-semibold">{d.label}</span>
-                                                    {d.is_tomorrow && (
-                                                        <span className="mt-0.5 text-[10px] text-gray-500">Tomorrow</span>
-                                                    )}
+                                                    {d.is_tomorrow && <span className="mt-0.5 text-[10px] text-gray-500">Tomorrow</span>}
                                                 </button>
                                             ))}
                                         </div>
@@ -275,14 +265,14 @@ export default function CheckoutIndex({
 
                                     {/* Time slots */}
                                     <div>
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Time slot</p>
+                                        <p className="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Time slot</p>
                                         <div className="flex flex-wrap gap-2 sm:gap-3">
                                             {DELIVERY_SLOTS.map((slot) => (
                                                 <button
                                                     key={slot.id}
                                                     type="button"
                                                     onClick={() => setData('scheduled_delivery_time', slot.id)}
-                                                    className={`flex flex-1 min-w-[120px] items-center gap-2 rounded-xl border-2 px-4 py-3 text-left transition-colors sm:min-w-0 ${
+                                                    className={`flex min-w-[120px] flex-1 items-center gap-2 rounded-xl border-2 px-4 py-3 text-left transition-colors sm:min-w-0 ${
                                                         data.scheduled_delivery_time === slot.id
                                                             ? 'border-[var(--theme-primary-1)] bg-[var(--theme-primary-1)]/10 text-[var(--theme-primary-1)]'
                                                             : 'border-gray-200 bg-gray-50/80 text-gray-700 hover:border-gray-300'
@@ -333,10 +323,17 @@ export default function CheckoutIndex({
                                                         disabled={isDisabled}
                                                         className="mt-1 h-4 w-4 border-gray-300 text-[var(--theme-primary-1)] focus:ring-[var(--theme-primary-1)] disabled:opacity-50"
                                                     />
-                                                    <Icon className={`h-5 w-5 ${method.id === 'wallet' && canPayWithWallet ? 'text-emerald-500' : 'text-gray-500'}`} strokeWidth={2} />
+                                                    <Icon
+                                                        className={`h-5 w-5 ${method.id === 'wallet' && canPayWithWallet ? 'text-emerald-500' : 'text-gray-500'}`}
+                                                        strokeWidth={2}
+                                                    />
                                                     <div className="min-w-0 flex-1">
-                                                        <span className={`font-semibold ${isDisabled ? 'text-gray-500' : 'text-gray-900'}`}>{method.label}</span>
-                                                        <p className={`mt-0.5 text-xs ${method.id === 'wallet' && !canPayWithWallet ? 'text-red-500' : 'text-gray-500'}`}>
+                                                        <span className={`font-semibold ${isDisabled ? 'text-gray-500' : 'text-gray-900'}`}>
+                                                            {method.label}
+                                                        </span>
+                                                        <p
+                                                            className={`mt-0.5 text-xs ${method.id === 'wallet' && !canPayWithWallet ? 'text-red-500' : 'text-gray-500'}`}
+                                                        >
                                                             {method.description}
                                                         </p>
                                                         {method.id === 'wallet' && !canPayWithWallet && (
@@ -359,7 +356,10 @@ export default function CheckoutIndex({
                                     className="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm sm:p-6"
                                     aria-labelledby="instructions-heading"
                                 >
-                                    <h2 id="instructions-heading" className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900 sm:text-lg">
+                                    <h2
+                                        id="instructions-heading"
+                                        className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900 sm:text-lg"
+                                    >
                                         <FileText className="h-5 w-5 text-[var(--theme-primary-1)]" strokeWidth={2} />
                                         Delivery Instructions (Optional)
                                     </h2>
@@ -368,7 +368,7 @@ export default function CheckoutIndex({
                                         value={data.delivery_instructions}
                                         onChange={(e) => setData('delivery_instructions', e.target.value)}
                                         rows={3}
-                                        className="w-full rounded-xl border-2 border-gray-200 bg-gray-50/50 px-4 py-3 text-sm font-medium text-gray-900 placeholder:text-gray-400 transition-colors focus:border-[var(--theme-primary-1)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary-1)]/20"
+                                        className="w-full rounded-xl border-2 border-gray-200 bg-gray-50/50 px-4 py-3 text-sm font-medium text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[var(--theme-primary-1)] focus:bg-white focus:ring-2 focus:ring-[var(--theme-primary-1)]/20 focus:outline-none"
                                     />
                                 </section>
                             </div>
@@ -384,7 +384,7 @@ export default function CheckoutIndex({
                                         <h2 id="summary-heading" className="mb-4 text-base font-bold text-gray-900 sm:text-lg">
                                             Order Summary ({summary.unique_items} items)
                                         </h2>
-                                        <ul className="space-y-3 max-h-[300px] overflow-y-auto">
+                                        <ul className="max-h-[300px] space-y-3 overflow-y-auto">
                                             {items.map((item) => (
                                                 <li key={item.id} className="flex gap-3">
                                                     <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
@@ -396,14 +396,13 @@ export default function CheckoutIndex({
                                                         />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{item.product.name}</p>
+                                                        <p className="line-clamp-1 text-sm font-medium text-gray-900">{item.product.name}</p>
+                                                        {item.variant && <p className="text-[11px] text-gray-500">{item.variant.name}</p>}
                                                         <p className="text-xs text-gray-500">
                                                             ₹{parseFloat(item.price).toFixed(2)} × {item.quantity}
                                                         </p>
                                                     </div>
-                                                    <p className="text-sm font-semibold text-gray-900">
-                                                        ₹{parseFloat(item.subtotal).toFixed(2)}
-                                                    </p>
+                                                    <p className="text-sm font-semibold text-gray-900">₹{parseFloat(item.subtotal).toFixed(2)}</p>
                                                 </li>
                                             ))}
                                         </ul>
@@ -427,7 +426,9 @@ export default function CheckoutIndex({
                                                     <Truck className="h-4 w-4" />
                                                     Delivery
                                                 </dt>
-                                                <dd className={deliveryCharge === 0 ? 'font-semibold text-[var(--theme-primary-1)]' : 'font-semibold'}>
+                                                <dd
+                                                    className={deliveryCharge === 0 ? 'font-semibold text-[var(--theme-primary-1)]' : 'font-semibold'}
+                                                >
                                                     {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
                                                 </dd>
                                             </div>
@@ -450,7 +451,7 @@ export default function CheckoutIndex({
                                         </div>
 
                                         {/* Global errors */}
-                                        {((errors as unknown as Record<string, string>).checkout) && (
+                                        {(errors as unknown as Record<string, string>).checkout && (
                                             <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                                                 <p className="flex items-center gap-1.5">
                                                     <AlertCircle className="h-4 w-4 shrink-0" />
@@ -462,7 +463,7 @@ export default function CheckoutIndex({
                                         <button
                                             type="submit"
                                             disabled={processing || !selectedAddress?.zone}
-                                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             {processing ? (
                                                 <>
@@ -478,9 +479,7 @@ export default function CheckoutIndex({
                                         </button>
 
                                         {!selectedAddress?.zone && (
-                                            <p className="mt-2 text-center text-xs text-red-600">
-                                                Selected address is not serviceable
-                                            </p>
+                                            <p className="mt-2 text-center text-xs text-red-600">Selected address is not serviceable</p>
                                         )}
                                     </section>
                                 </div>
@@ -489,8 +488,8 @@ export default function CheckoutIndex({
                     </form>
 
                     {/* Sticky CTA on mobile */}
-                    <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] lg:hidden">
-                        <div className="container mx-auto max-w-7xl flex items-center justify-between gap-4">
+                    <div className="fixed right-0 bottom-0 left-0 z-30 border-t border-gray-200 bg-white p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] lg:hidden">
+                        <div className="container mx-auto flex max-w-7xl items-center justify-between gap-4">
                             <div>
                                 <p className="text-xs text-gray-500">Total</p>
                                 <p className="text-xl font-bold text-gray-900">₹{total.toFixed(2)}</p>
@@ -500,13 +499,9 @@ export default function CheckoutIndex({
                                 form="checkout-form"
                                 onClick={handleSubmit}
                                 disabled={processing || !selectedAddress?.zone}
-                                className="flex flex-1 max-w-[200px] items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex max-w-[200px] flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {processing ? (
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                ) : (
-                                    'Place Order'
-                                )}
+                                {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Place Order'}
                             </button>
                         </div>
                     </div>
@@ -515,4 +510,3 @@ export default function CheckoutIndex({
         </UserLayout>
     );
 }
-

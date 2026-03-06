@@ -77,11 +77,13 @@ class OrderItem extends Model
     public static function createFromCartItem(Order $order, CartItem $cartItem): self
     {
         $product = $cartItem->product;
+        $variantLabel = $cartItem->variant?->name;
+        $productName = $variantLabel ? "{$product->name} ({$variantLabel})" : $product->name;
 
         return self::create([
             'order_id' => $order->id,
             'product_id' => $product->id,
-            'product_name' => $product->name,
+            'product_name' => $productName,
             'product_sku' => $product->sku,
             'product_image' => $product->image,
             'quantity' => $cartItem->quantity,

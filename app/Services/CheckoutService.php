@@ -343,7 +343,7 @@ class CheckoutService
      */
     protected function createOrderItems(Order $order, Cart $cart): void
     {
-        $items = $cart->items()->with('product')->get();
+        $items = $cart->items()->with(['product', 'variant'])->get();
 
         foreach ($items as $cartItem) {
             OrderItem::createFromCartItem($order, $cartItem);
