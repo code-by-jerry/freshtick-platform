@@ -1,12 +1,8 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, Mail, Phone, Play, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Heart, MapPin, Mail, Package, Phone, Play, Plus, Sparkles, TicketPercent, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import HeroBanner from '@/components/user/HeroBanner';
-import DailyHomeSections from '@/components/user/home/daily/DailyHomeSections';
-import SocietyCategoriesSection from '@/components/user/home/society/SocietyCategoriesSection';
-import SocietyDeliveryMarqueeSection from '@/components/user/home/society/SocietyDeliveryMarqueeSection';
 import SocietyHomeSections from '@/components/user/home/society/SocietyHomeSections';
-import SocietyProductsSection from '@/components/user/home/society/SocietyProductsSection';
 import SocietySubscriptionStepsSection from '@/components/user/home/society/SocietySubscriptionStepsSection';
 import UserLayout from '@/layouts/UserLayout';
 import { getVerticalFromQuery } from '@/lib/vertical';
@@ -22,6 +18,7 @@ interface ProductItem {
     id: number;
     name: string;
     slug: string;
+    category_id: number | null;
     image: string;
     short_description?: string | null;
     price: number;
@@ -95,6 +92,7 @@ interface Banner {
     mobile_image: string;
     link: string | null;
     link_type: string;
+    vertical?: string;
 }
 
 interface Category {
@@ -120,6 +118,25 @@ interface SubscriptionPlanFeature {
     highlight: boolean;
 }
 
+interface CouponOffer {
+    id: number;
+    code: string;
+    name: string;
+    discount_label: string;
+    type: string;
+    value: number;
+    min_order_amount: number | null;
+    max_discount: number | null;
+}
+
+interface CustomerFavouritesCollection {
+    id: number;
+    slug: string;
+    banner_image: string | null;
+    banner_mobile_image: string | null;
+    products: ProductItem[];
+}
+
 interface SubscriptionPlan {
     id: number;
     name: string;
@@ -133,12 +150,23 @@ interface SubscriptionPlan {
 
 interface HomeProps {
     banners: Banner[];
+    promotionalBanners: Banner[];
+    coupons: CouponOffer[];
+    customerFavouritesCollection: CustomerFavouritesCollection | null;
     categories: Category[];
     products: ProductItem[];
     subscriptionPlans: SubscriptionPlan[];
 }
 
-export default function Home({ banners, categories, products = [], subscriptionPlans = [] }: HomeProps) {
+export default function Home({
+    banners,
+    promotionalBanners,
+    coupons,
+    customerFavouritesCollection,
+    categories,
+    products = [],
+    subscriptionPlans = [],
+}: HomeProps) {
     // Old carousel state - removed (using HeroBanner component now)
     // const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -146,7 +174,6 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const [, setStepPx] = useState(0);
     const [testimonialCardsPerView, setTestimonialCardsPerView] = useState(1);
     const [, setTestimonialStepPx] = useState(0);
-    const [similarCardMediaIndex, setSimilarCardMediaIndex] = useState<Record<string, number>>({});
     const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
     const [storyProgress, setStoryProgress] = useState(0);
     const page = usePage<{ auth?: { user?: unknown; wishlisted_products?: number[] } }>();
@@ -155,8 +182,6 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const selectedVertical = getVerticalFromQuery(currentQuery);
     const wishlistedProductIds = new Set(auth?.wishlisted_products || []);
     const [selectedVariants, setSelectedVariants] = useState<Record<number, number>>({});
-    const [categoryActivePage, setCategoryActivePage] = useState(0);
-    const [productActivePage, setProductActivePage] = useState(0);
     const [storiesActivePage, setStoriesActivePage] = useState(0);
     const [testimonialsActivePage, setTestimonialsActivePage] = useState(0);
     const [mobileCardAddingProductId, setMobileCardAddingProductId] = useState<number | null>(null);
@@ -164,8 +189,12 @@ export default function Home({ banners, categories, products = [], subscriptionP
     const [mobileOptionsVariantId, setMobileOptionsVariantId] = useState<number | null>(null);
     const [mobileOptionsQuantity, setMobileOptionsQuantity] = useState(1);
     const [mobileOptionsDrawerOpen, setMobileOptionsDrawerOpen] = useState(false);
+    const [desktopOptionsProduct, setDesktopOptionsProduct] = useState<ProductItem | null>(null);
+    const [desktopOptionsVariantId, setDesktopOptionsVariantId] = useState<number | null>(null);
+    const [desktopOptionsQuantity, setDesktopOptionsQuantity] = useState(1);
+    const [desktopOptionsDrawerOpen, setDesktopOptionsDrawerOpen] = useState(false);
+    const [bestSellerCategoryId, setBestSellerCategoryId] = useState<number | 'all'>('all');
     const productSliderRef = useRef<HTMLDivElement>(null);
-    const categorySliderRef = useRef<HTMLDivElement>(null);
     const storiesSliderRef = useRef<HTMLDivElement>(null);
     const testimonialsSliderRef = useRef<HTMLDivElement>(null);
 
@@ -196,10 +225,6 @@ export default function Home({ banners, categories, products = [], subscriptionP
         router.post(`/wishlist/toggle/${id}`, {}, { preserveScroll: true, preserveState: true });
     };
 
-    const setSimilarCardMediaIndexForKey = (key: string, index: number) => {
-        setSimilarCardMediaIndex((prev) => ({ ...prev, [key]: index }));
-    };
-
     const DEFAULT_IMAGE_FALLBACK = '/images/dairy-products.png';
 
     const getSafeUrl = (url: string | null | undefined) => {
@@ -225,8 +250,43 @@ export default function Home({ banners, categories, products = [], subscriptionP
 
     const dailyCategories = categories.filter((category) => category.vertical === 'daily_fresh' || category.vertical === 'both');
     const societyCategories = categories.filter((category) => category.vertical === 'society_fresh' || category.vertical === 'both');
+    const dailyCategoryIdSet = new Set(dailyCategories.map((category) => category.id));
     const mobileCategories = selectedVertical === 'daily_fresh' ? dailyCategories : societyCategories;
     const mobileShowcaseProducts = products.filter((product) => !product.is_subscription_eligible).slice(0, 12);
+    const dailyBestSellerProducts = mobileShowcaseProducts.filter(
+        (product) => product.category_id !== null && dailyCategoryIdSet.has(product.category_id),
+    );
+    const dailyBestSellerCategoryCounts = dailyBestSellerProducts.reduce<Record<number, number>>((counts, product) => {
+        if (product.category_id === null) {
+            return counts;
+        }
+
+        counts[product.category_id] = (counts[product.category_id] ?? 0) + 1;
+
+        return counts;
+    }, {});
+    const sortedDailyBestSellerCategories = [...dailyCategories].sort((a, b) => {
+        const countDiff = (dailyBestSellerCategoryCounts[b.id] ?? 0) - (dailyBestSellerCategoryCounts[a.id] ?? 0);
+
+        if (countDiff !== 0) {
+            return countDiff;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
+    const filteredBestSellerProducts =
+        bestSellerCategoryId === 'all'
+            ? dailyBestSellerProducts
+            : dailyBestSellerProducts.filter((product) => product.category_id === bestSellerCategoryId);
+    const heroBanners = banners.filter((banner) => {
+        return banner.vertical === undefined || banner.vertical === selectedVertical || banner.vertical === 'both';
+    });
+    const promoBanners = promotionalBanners.filter((banner) => {
+        return banner.vertical === undefined || banner.vertical === selectedVertical || banner.vertical === 'both';
+    });
+    const homeCoupons = coupons.slice(0, 10);
+    const customerFavouriteProducts = customerFavouritesCollection?.products ?? [];
+    const COUPON_BACKGROUND_IMAGE = '/images/coupon%20(1).png';
 
     const formatPrice = (price: number) => {
         return '₹' + price.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -287,6 +347,30 @@ export default function Home({ banners, categories, products = [], subscriptionP
 
         window.requestAnimationFrame(() => {
             setMobileOptionsDrawerOpen(true);
+        });
+    };
+
+    const closeDesktopOptionsDrawer = () => {
+        setDesktopOptionsDrawerOpen(false);
+
+        window.setTimeout(() => {
+            setDesktopOptionsProduct(null);
+            setDesktopOptionsVariantId(null);
+            setDesktopOptionsQuantity(1);
+        }, 200);
+    };
+
+    const openDesktopOptionsDrawer = (product: ProductItem) => {
+        const activeVariants = getActiveVariants(product);
+        const preselectedVariantId = activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : null;
+
+        setDesktopOptionsProduct(product);
+        setDesktopOptionsVariantId(preselectedVariantId);
+        setDesktopOptionsQuantity(1);
+        setDesktopOptionsDrawerOpen(false);
+
+        window.requestAnimationFrame(() => {
+            setDesktopOptionsDrawerOpen(true);
         });
     };
 
@@ -441,12 +525,12 @@ export default function Home({ banners, categories, products = [], subscriptionP
         return (
             <section className="bg-white py-3 lg:hidden">
                 <div className="container mx-auto px-3">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h2 className="text-sm font-bold text-gray-900">Top Picks</h2>
-                        <Link href={`/products?vertical=${selectedVertical}`} className="text-[11px] font-semibold text-(--theme-primary-1)">
-                            View All
-                        </Link>
-                    </div>
+                    {renderSectionHeader(
+                        'Top Picks',
+                        'Handpicked for today',
+                        `/products?vertical=${selectedVertical}`,
+                        <Sparkles className="h-6 w-6" strokeWidth={2.2} />,
+                    )}
 
                     <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
                         {mobileShowcaseProducts.map((product) => {
@@ -475,12 +559,16 @@ export default function Home({ banners, categories, products = [], subscriptionP
 
                                         <button
                                             type="button"
-                                            onClick={() => toggleProductWishlist(product.id)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                toggleProductWishlist(product.id);
+                                            }}
                                             aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                                            className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 shadow-sm"
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 sm:h-8 sm:w-8"
                                         >
                                             <Heart
-                                                className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'fill-white text-black'}`}
                                                 strokeWidth={2}
                                             />
                                         </button>
@@ -513,9 +601,7 @@ export default function Home({ banners, categories, products = [], subscriptionP
                                         )}
 
                                         <Link href={`/products/${product.slug}?vertical=${selectedVertical}`}>
-                                            <p className="mt-0.5 line-clamp-1 text-[11px] leading-[1.2] font-semibold text-gray-900">
-                                                {product.name}
-                                            </p>
+                                            <p className="mt-0.5 line-clamp-1 text-xs leading-tight font-semibold text-gray-900">{product.name}</p>
                                         </Link>
                                         <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
                                             {product.short_description || 'Fresh daily quality.'}
@@ -525,7 +611,7 @@ export default function Home({ banners, categories, products = [], subscriptionP
                                         <button
                                             type="button"
                                             onClick={() => openMobileOptionsDrawer(product)}
-                                            className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700"
+                                            className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-700"
                                         >
                                             See options
                                         </button>
@@ -533,6 +619,770 @@ export default function Home({ banners, categories, products = [], subscriptionP
                                 </article>
                             );
                         })}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderDailyBestSellersSection = () => {
+        if (dailyBestSellerProducts.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="bg-white py-3 lg:py-6">
+                <div className="container mx-auto px-3 lg:px-4">
+                    {renderSectionHeader(
+                        'Best Sellers',
+                        'Pick a category and shop fast',
+                        '/products?vertical=daily_fresh',
+                        <Sparkles className="h-6 w-6" strokeWidth={2.2} />,
+                    )}
+
+                    <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1">
+                        <button
+                            type="button"
+                            onClick={() => setBestSellerCategoryId('all')}
+                            className={`group flex w-16 shrink-0 flex-col items-center rounded-lg border p-1 text-center transition-all sm:w-19 sm:rounded-xl sm:p-1.5 ${
+                                bestSellerCategoryId === 'all'
+                                    ? 'border-(--theme-primary-1) bg-(--theme-primary-1)/8'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}
+                        >
+                            <img
+                                src={DEFAULT_IMAGE_FALLBACK}
+                                alt="All categories"
+                                className="h-8 w-8 rounded-md bg-gray-50 object-cover sm:h-10 sm:w-10 sm:rounded-lg"
+                                loading="lazy"
+                            />
+                            <span
+                                className={`mt-1 line-clamp-1 text-[9px] leading-tight font-semibold sm:text-[10px] ${
+                                    bestSellerCategoryId === 'all' ? 'text-(--theme-primary-1)' : 'text-gray-700'
+                                }`}
+                            >
+                                All
+                            </span>
+                            <span className="text-[8px] text-gray-400 sm:text-[9px]">{dailyBestSellerProducts.length} items</span>
+                        </button>
+
+                        {sortedDailyBestSellerCategories.map((category) => (
+                            <button
+                                key={category.id}
+                                type="button"
+                                onClick={() => setBestSellerCategoryId(category.id)}
+                                className={`group flex w-16 shrink-0 flex-col items-center rounded-lg border p-1 text-center transition-all sm:w-19 sm:rounded-xl sm:p-1.5 ${
+                                    bestSellerCategoryId === category.id
+                                        ? 'border-(--theme-primary-1) bg-(--theme-primary-1)/8'
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                }`}
+                            >
+                                <img
+                                    src={getSafeUrl(category.image)}
+                                    alt={category.name}
+                                    className="h-8 w-8 rounded-md bg-gray-50 object-cover sm:h-10 sm:w-10 sm:rounded-lg"
+                                    loading="lazy"
+                                    onError={(event) => {
+                                        (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                    }}
+                                />
+                                <span
+                                    className={`mt-1 line-clamp-1 text-[9px] leading-tight font-semibold sm:text-[10px] ${
+                                        bestSellerCategoryId === category.id ? 'text-(--theme-primary-1)' : 'text-gray-700'
+                                    }`}
+                                >
+                                    {category.name}
+                                </span>
+                                <span className="text-[8px] text-gray-400 sm:text-[9px]">
+                                    {dailyBestSellerCategoryCounts[category.id] ?? 0} items
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                        {filteredBestSellerProducts.map((product) => {
+                            const displayPrice = getDisplayPrice(product);
+                            const hasDiscount = typeof product.compare_at_price === 'number' && product.compare_at_price > displayPrice;
+                            const savings = hasDiscount ? Math.round((product.compare_at_price as number) - displayPrice) : 0;
+                            const activeVariants = getActiveVariants(product);
+                            const selectedVariantId = activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : undefined;
+                            const isWishlisted = wishlistedProductIds.has(product.id);
+                            const weightLabel = getWeightUnitLabel(product);
+
+                            return (
+                                <article key={product.id} className="w-[calc(33.333%-6px)] min-w-24 shrink-0 sm:w-[calc(25%-8px)] lg:w-56">
+                                    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xs">
+                                        <Link href={`/products/${product.slug}?vertical=daily_fresh`} className="block">
+                                            <img
+                                                src={getSafeUrl(product.image)}
+                                                alt={product.name}
+                                                className="h-20 w-full rounded-lg bg-gray-50 object-cover lg:aspect-square lg:h-auto"
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                                }}
+                                            />
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                toggleProductWishlist(product.id);
+                                            }}
+                                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 sm:h-8 sm:w-8"
+                                        >
+                                            <Heart
+                                                className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                strokeWidth={2}
+                                            />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => addMobileCardProductToCart(product, 1, selectedVariantId)}
+                                            disabled={mobileCardAddingProductId === product.id}
+                                            className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-lg border border-blue-600 bg-blue-50 text-blue-700 shadow-sm disabled:opacity-60"
+                                            aria-label="Add to cart"
+                                        >
+                                            <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-1 lg:min-h-28">
+                                        <div className="flex items-center gap-1">
+                                            <span className="inline-flex rounded-md bg-green-600 px-1.5 py-0.5 text-[11px] leading-none font-bold text-white">
+                                                {formatPrice(displayPrice)}
+                                            </span>
+                                            {hasDiscount && (
+                                                <span className="text-[11px] font-medium text-gray-400 line-through">
+                                                    {formatPrice(product.compare_at_price as number)}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {hasDiscount && savings > 0 && (
+                                            <p className="mt-0.5 text-[10px] font-semibold text-green-700">₹{savings} OFF</p>
+                                        )}
+
+                                        <Link href={`/products/${product.slug}?vertical=daily_fresh`}>
+                                            <p className="mt-0.5 line-clamp-1 text-xs leading-tight font-semibold text-gray-900">{product.name}</p>
+                                        </Link>
+                                        <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                                            {product.short_description || 'Fresh daily quality.'}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] text-gray-500">{weightLabel || getMobilePackLabel(product)}</p>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openMobileOptionsDrawer(product)}
+                                            className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-700"
+                                        >
+                                            See options
+                                        </button>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+
+                    {filteredBestSellerProducts.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
+                            No products found in this category.
+                        </div>
+                    )}
+                </div>
+            </section>
+        );
+    };
+
+    const renderSectionHeader = (title: string, tagline: string, viewAllHref: string | null, icon: React.ReactNode) => {
+        return (
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-(--theme-primary-1)/12 text-(--theme-primary-1)">
+                        {icon}
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="truncate text-base leading-tight font-bold text-(--theme-primary-1) sm:text-lg">{title}</h2>
+                        <p className="truncate text-xs text-gray-400 sm:text-sm">{tagline}</p>
+                    </div>
+                </div>
+
+                {viewAllHref && (
+                    <Link
+                        href={viewAllHref}
+                        className="shrink-0 rounded-xl border border-(--theme-primary-1) px-3 py-1.5 text-sm font-semibold text-(--theme-primary-1) transition-colors hover:bg-(--theme-primary-1)/5"
+                    >
+                        View All
+                    </Link>
+                )}
+            </div>
+        );
+    };
+
+    const renderMobileCategorySection = (categoryItems: Category[], verticalParam: 'daily_fresh' | 'society_fresh') => {
+        if (categoryItems.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="bg-white py-2 lg:hidden">
+                <div className="container mx-auto px-3">
+                    {renderSectionHeader(
+                        'Browse Categories',
+                        'Fresh dairy delivered',
+                        `/products?vertical=${verticalParam}`,
+                        <Package className="h-6 w-6" strokeWidth={2.2} />,
+                    )}
+
+                    <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+                        {categoryItems.map((category) => (
+                            <Link
+                                key={category.id}
+                                href={`/categories/${category.slug}?vertical=${verticalParam}`}
+                                className="w-22 shrink-0 rounded-xl p-1.5 text-center"
+                            >
+                                <img
+                                    src={getSafeUrl(category.image)}
+                                    alt={category.name}
+                                    className="mx-auto h-14 w-14 rounded-lg object-cover"
+                                    loading="lazy"
+                                    onError={(event) => {
+                                        (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                    }}
+                                />
+                                <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-medium text-gray-800">{category.name}</p>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderDesktopCategorySection = (categoryItems: Category[], verticalParam: 'daily_fresh' | 'society_fresh') => {
+        if (categoryItems.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="hidden bg-white py-6 lg:block">
+                <div className="container mx-auto px-4">
+                    {renderSectionHeader(
+                        'Browse Categories',
+                        'Fresh dairy delivered',
+                        `/products?vertical=${verticalParam}`,
+                        <Package className="h-6 w-6" strokeWidth={2.2} />,
+                    )}
+
+                    <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+                        {categoryItems.map((category) => (
+                            <Link
+                                key={category.id}
+                                href={`/categories/${category.slug}?vertical=${verticalParam}`}
+                                className="group w-40 shrink-0 rounded-2xl p-2 text-center transition-transform duration-200 hover:-translate-y-0.5"
+                            >
+                                <img
+                                    src={getSafeUrl(category.image)}
+                                    alt={category.name}
+                                    className="mx-auto h-24 w-24 rounded-2xl bg-gray-50 object-cover"
+                                    loading="lazy"
+                                    onError={(event) => {
+                                        (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                    }}
+                                />
+                                <p className="mt-2 line-clamp-2 text-sm font-semibold text-gray-800">{category.name}</p>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderDesktopTopPicks = () => {
+        if (mobileShowcaseProducts.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="hidden bg-white py-6 lg:block">
+                <div className="container mx-auto px-4">
+                    {renderSectionHeader(
+                        'Top Picks',
+                        'Handpicked for today',
+                        `/products?vertical=${selectedVertical}`,
+                        <Sparkles className="h-6 w-6" strokeWidth={2.2} />,
+                    )}
+
+                    <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+                        {mobileShowcaseProducts.map((product) => {
+                            const displayPrice = getDisplayPrice(product);
+                            const hasDiscount = typeof product.compare_at_price === 'number' && product.compare_at_price > displayPrice;
+                            const savings = hasDiscount ? Math.round((product.compare_at_price as number) - displayPrice) : 0;
+                            const activeVariants = getActiveVariants(product);
+                            const selectedVariantId = activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : undefined;
+                            const isWishlisted = wishlistedProductIds.has(product.id);
+                            const weightLabel = getWeightUnitLabel(product);
+
+                            return (
+                                <article key={product.id} className="w-52 shrink-0 xl:w-56">
+                                    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xs">
+                                        <Link href={`/products/${product.slug}?vertical=${selectedVertical}`} className="block">
+                                            <img
+                                                src={getSafeUrl(product.image)}
+                                                alt={product.name}
+                                                className="aspect-square w-full rounded-lg bg-gray-50 object-cover"
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                                }}
+                                            />
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                toggleProductWishlist(product.id);
+                                            }}
+                                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                                            className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 sm:h-8 sm:w-8"
+                                        >
+                                            <Heart
+                                                className={`h-3.5 w-3.5 transition-all duration-200 sm:h-4 sm:w-4 ${isWishlisted ? 'scale-110 fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                strokeWidth={2}
+                                            />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => addMobileCardProductToCart(product, 1, selectedVariantId)}
+                                            disabled={mobileCardAddingProductId === product.id}
+                                            className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-lg border border-blue-600 bg-blue-50 text-blue-700 shadow-sm disabled:opacity-60"
+                                            aria-label="Add to cart"
+                                        >
+                                            <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-1">
+                                        <div className="flex items-center gap-1">
+                                            <span className="inline-flex rounded-md bg-green-600 px-1.5 py-0.5 text-[11px] leading-none font-bold text-white">
+                                                {formatPrice(displayPrice)}
+                                            </span>
+                                            {hasDiscount && (
+                                                <span className="text-[11px] font-medium text-gray-400 line-through">
+                                                    {formatPrice(product.compare_at_price as number)}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {hasDiscount && savings > 0 && (
+                                            <p className="mt-0.5 text-[10px] font-semibold text-green-700">₹{savings} OFF</p>
+                                        )}
+
+                                        <Link href={`/products/${product.slug}?vertical=${selectedVertical}`}>
+                                            <p className="mt-0.5 line-clamp-1 text-xs leading-tight font-semibold text-gray-900">{product.name}</p>
+                                        </Link>
+                                        <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">
+                                            {product.short_description || 'Fresh daily quality.'}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] text-gray-500">{weightLabel || getMobilePackLabel(product)}</p>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openDesktopOptionsDrawer(product)}
+                                            className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700"
+                                        >
+                                            See options
+                                        </button>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderDesktopOptionsDrawer = () => {
+        if (!desktopOptionsProduct) {
+            return null;
+        }
+
+        const drawerVariants = getActiveVariants(desktopOptionsProduct);
+        const selectedDrawerVariant = drawerVariants.find((variant) => variant.id === desktopOptionsVariantId) ?? null;
+        const unitPrice = selectedDrawerVariant ? selectedDrawerVariant.price : getDisplayPrice(desktopOptionsProduct);
+        const totalPrice = unitPrice * desktopOptionsQuantity;
+        const weightLabel = getWeightUnitLabel(desktopOptionsProduct);
+
+        return (
+            <div className="fixed inset-0 z-1300 hidden lg:block" role="dialog" aria-modal="true" aria-label="Product options">
+                <button
+                    type="button"
+                    className={`absolute inset-0 bg-black/45 transition-opacity duration-200 ${desktopOptionsDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+                    onClick={closeDesktopOptionsDrawer}
+                    aria-label="Close options"
+                />
+
+                <div
+                    className={`absolute top-0 right-0 h-full w-full max-w-md overflow-y-auto bg-white p-5 shadow-2xl transition-transform duration-200 ${
+                        desktopOptionsDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+                    }`}
+                >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                            <p className="line-clamp-2 text-lg font-bold text-gray-900">{desktopOptionsProduct.name}</p>
+                            <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                                {desktopOptionsProduct.short_description || 'Select your preferred option and add to cart.'}
+                            </p>
+                            {weightLabel && <p className="mt-1 text-xs font-medium text-gray-700">{weightLabel}</p>}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={closeDesktopOptionsDrawer}
+                            className="rounded-full border border-gray-200 p-2 text-gray-500"
+                            aria-label="Close options"
+                        >
+                            <X className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                    </div>
+
+                    {drawerVariants.length > 0 && (
+                        <div className="mb-4 space-y-2">
+                            <p className="text-sm font-semibold text-gray-700">Available options</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {drawerVariants.map((variant) => (
+                                    <button
+                                        key={variant.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setDesktopOptionsVariantId(variant.id);
+                                            setSelectedVariants((prev) => ({ ...prev, [desktopOptionsProduct.id]: variant.id }));
+                                        }}
+                                        className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                                            desktopOptionsVariantId === variant.id
+                                                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                                : 'border-gray-200 bg-white text-gray-700'
+                                        }`}
+                                    >
+                                        <p className="line-clamp-1">{variant.name}</p>
+                                        <p className="mt-0.5 text-xs">{formatPrice(variant.price)}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {drawerVariants.length === 0 && <p className="mb-4 text-sm text-gray-600">{getMobilePackLabel(desktopOptionsProduct)}</p>}
+
+                    <div className="mb-4 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <p className="text-sm font-semibold text-gray-700">Quantity</p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDesktopOptionsQuantity((current) => Math.max(1, current - 1))}
+                                className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700"
+                                aria-label="Decrease quantity"
+                            >
+                                -
+                            </button>
+                            <span className="min-w-6 text-center text-base font-semibold text-gray-900">{desktopOptionsQuantity}</span>
+                            <button
+                                type="button"
+                                onClick={() => setDesktopOptionsQuantity((current) => Math.min(20, current + 1))}
+                                className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700"
+                                aria-label="Increase quantity"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            addMobileCardProductToCart(desktopOptionsProduct, desktopOptionsQuantity, desktopOptionsVariantId ?? undefined, false)
+                        }
+                        disabled={mobileCardAddingProductId === desktopOptionsProduct.id}
+                        className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                        {mobileCardAddingProductId === desktopOptionsProduct.id ? 'Adding...' : `Add to Cart • ${formatPrice(totalPrice)}`}
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderPromotionalBannerSection = () => {
+        if (promoBanners.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="lg:py-6">
+                <div className="lg:container lg:mx-auto lg:px-4">
+                    <HeroBanner banners={promoBanners} autoPlay={true} interval={5000} variant="promo" />
+                </div>
+            </section>
+        );
+    };
+
+    const renderCouponOffersSection = () => {
+        if (homeCoupons.length === 0) {
+            return null;
+        }
+
+        return (
+            <section className="py-2 lg:py-4">
+                <div className="container mx-auto px-5 lg:px-4">
+                    {renderSectionHeader('Coupon Offers', 'Unlock instant savings', null, <TicketPercent className="h-5 w-5" strokeWidth={2.2} />)}
+
+                    <div className="no-scrollbar flex snap-x snap-mandatory gap-1.5 overflow-x-auto pb-1 pl-3">
+                        {homeCoupons.map((coupon) => (
+                            <article key={coupon.id} className="w-36 shrink-0 snap-start sm:w-48 lg:w-64">
+                                <div className="relative overflow-hidden rounded-lg sm:rounded-xl">
+                                    <img
+                                        src={COUPON_BACKGROUND_IMAGE}
+                                        alt={`${coupon.code} coupon`}
+                                        className="h-18 w-full object-cover sm:h-24 lg:h-32"
+                                        loading="lazy"
+                                    />
+
+                                    <div className="absolute inset-0 flex flex-col justify-between p-1.5 sm:p-2.5 lg:p-3">
+                                        <div>
+                                            <p className="text-[7px] font-medium tracking-wide text-white/90 sm:text-[9px]">COUPON ID</p>
+                                            <p className="mt-0.5 inline-flex rounded border border-white/45 px-1 py-0.5 font-mono text-[7px] font-bold text-white sm:px-1.5 sm:text-[10px]">
+                                                {coupon.code}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="line-clamp-1 text-[10px] leading-tight font-bold text-[#f6d365] sm:text-sm lg:text-base">
+                                                {coupon.discount_label}
+                                            </p>
+                                            <p className="mt-0.5 line-clamp-2 text-[8px] leading-tight font-semibold text-white sm:text-[10px] lg:text-xs">
+                                                {coupon.name}
+                                            </p>
+                                            {coupon.min_order_amount !== null && (
+                                                <p className="mt-0.5 text-[7px] font-medium text-white/90 sm:text-[10px] lg:text-[11px]">
+                                                    Min order: {formatPrice(coupon.min_order_amount)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+    };
+
+    const renderDailyCustomerFavouritesSection = () => {
+        if (selectedVertical !== 'daily_fresh' || !customerFavouritesCollection || customerFavouriteProducts.length === 0) {
+            return null;
+        }
+
+        const desktopBannerImage = getSafeUrl(customerFavouritesCollection.banner_image ?? customerFavouritesCollection.banner_mobile_image);
+        const mobileBannerImage = getSafeUrl(customerFavouritesCollection.banner_mobile_image ?? customerFavouritesCollection.banner_image);
+
+        return (
+            <section className="py-3 lg:py-6">
+                <div className="mx-auto w-full max-w-7xl px-3 lg:px-4">
+                    <div className="relative min-h-62.5 overflow-hidden rounded-2xl lg:min-h-90 lg:rounded-3xl">
+                        <img
+                            src={mobileBannerImage}
+                            alt="Customer favourites"
+                            className="absolute inset-0 h-full w-full object-cover lg:hidden"
+                            loading="lazy"
+                        />
+                        <img
+                            src={desktopBannerImage}
+                            alt="Customer favourites"
+                            className="absolute inset-0 hidden h-full w-full object-cover lg:block"
+                            loading="lazy"
+                        />
+                        <div className="pointer-events-none absolute inset-0 bg-linear-to-r from-black/45 via-black/15 to-black/10 lg:from-black/10 lg:via-black/0 lg:to-black/0" />
+
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 px-3 lg:hidden">
+                            <div className="no-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1">
+                                {customerFavouriteProducts.map((product) => {
+                                    const displayPrice = getDisplayPrice(product);
+                                    const hasDiscount = typeof product.compare_at_price === 'number' && product.compare_at_price > displayPrice;
+                                    const activeVariants = getActiveVariants(product);
+                                    const selectedVariantId =
+                                        activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : undefined;
+                                    const isWishlisted = wishlistedProductIds.has(product.id);
+
+                                    return (
+                                        <article
+                                            key={`cf-mobile-${product.id}`}
+                                            className="w-40 shrink-0 snap-start rounded-xl border border-white/35 bg-white/90 p-1.5 backdrop-blur-sm"
+                                        >
+                                            <div className="group relative overflow-hidden rounded-lg">
+                                                <Link href={`/products/${product.slug}?vertical=daily_fresh`} className="block">
+                                                    <img
+                                                        src={getSafeUrl(product.image)}
+                                                        alt={product.name}
+                                                        className="h-24 w-full rounded-lg bg-gray-50 object-cover"
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                                        }}
+                                                    />
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        toggleProductWishlist(product.id);
+                                                    }}
+                                                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                                                    className="absolute top-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90"
+                                                >
+                                                    <Heart
+                                                        className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                        strokeWidth={2}
+                                                    />
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addMobileCardProductToCart(product, 1, selectedVariantId)}
+                                                    disabled={mobileCardAddingProductId === product.id}
+                                                    className="absolute right-1.5 bottom-1.5 flex h-6 w-6 items-center justify-center rounded-md border border-blue-600 bg-blue-50 text-blue-700 shadow-sm disabled:opacity-60"
+                                                    aria-label="Add to cart"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-1">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="inline-flex rounded-md bg-green-600 px-1.5 py-0.5 text-[10px] leading-none font-bold text-white">
+                                                        {formatPrice(displayPrice)}
+                                                    </span>
+                                                    {hasDiscount && (
+                                                        <span className="text-[10px] font-medium text-gray-400 line-through">
+                                                            {formatPrice(product.compare_at_price as number)}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <Link href={`/products/${product.slug}?vertical=daily_fresh`}>
+                                                    <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-gray-900">{product.name}</p>
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openMobileOptionsDrawer(product)}
+                                                    className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700"
+                                                >
+                                                    See options
+                                                </button>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="absolute inset-y-0 right-0 hidden w-[70%] items-center pr-5 lg:flex">
+                            <div className="no-scrollbar flex w-full snap-x snap-mandatory gap-3 overflow-x-auto py-3">
+                                {customerFavouriteProducts.map((product) => {
+                                    const displayPrice = getDisplayPrice(product);
+                                    const hasDiscount = typeof product.compare_at_price === 'number' && product.compare_at_price > displayPrice;
+                                    const activeVariants = getActiveVariants(product);
+                                    const selectedVariantId =
+                                        activeVariants.length > 0 ? (getSelectedVariantId(product) ?? activeVariants[0].id) : undefined;
+                                    const isWishlisted = wishlistedProductIds.has(product.id);
+
+                                    return (
+                                        <article
+                                            key={`cf-desktop-${product.id}`}
+                                            className="w-52 shrink-0 snap-start rounded-xl border border-white/35 bg-white/92 p-2 backdrop-blur-sm"
+                                        >
+                                            <div className="group relative overflow-hidden rounded-lg">
+                                                <Link href={`/products/${product.slug}?vertical=daily_fresh`} className="block">
+                                                    <img
+                                                        src={getSafeUrl(product.image)}
+                                                        alt={product.name}
+                                                        className="aspect-square w-full rounded-lg bg-gray-50 object-cover"
+                                                        loading="lazy"
+                                                        onError={(event) => {
+                                                            (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
+                                                        }}
+                                                    />
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        toggleProductWishlist(product.id);
+                                                    }}
+                                                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                                                    className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/95"
+                                                >
+                                                    <Heart
+                                                        className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-red-500 text-red-500' : 'fill-white text-black'}`}
+                                                        strokeWidth={2}
+                                                    />
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addMobileCardProductToCart(product, 1, selectedVariantId)}
+                                                    disabled={mobileCardAddingProductId === product.id}
+                                                    className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-md border border-blue-600 bg-blue-50 text-blue-700 shadow-sm disabled:opacity-60"
+                                                    aria-label="Add to cart"
+                                                >
+                                                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-1.5">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="inline-flex rounded-md bg-green-600 px-1.5 py-0.5 text-[11px] leading-none font-bold text-white">
+                                                        {formatPrice(displayPrice)}
+                                                    </span>
+                                                    {hasDiscount && (
+                                                        <span className="text-[11px] font-medium text-gray-400 line-through">
+                                                            {formatPrice(product.compare_at_price as number)}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <Link href={`/products/${product.slug}?vertical=daily_fresh`}>
+                                                    <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-gray-900">{product.name}</p>
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openDesktopOptionsDrawer(product)}
+                                                    className="mt-1 w-full rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700"
+                                                >
+                                                    See options
+                                                </button>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -631,6 +1481,19 @@ export default function Home({ banners, categories, products = [], subscriptionP
     }, [mobileOptionsProduct]);
 
     useEffect(() => {
+        if (!desktopOptionsProduct) {
+            return;
+        }
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [desktopOptionsProduct]);
+
+    useEffect(() => {
         if (!mobileOptionsProduct) {
             return;
         }
@@ -648,44 +1511,48 @@ export default function Home({ banners, categories, products = [], subscriptionP
         };
     }, [mobileOptionsProduct]);
 
+    useEffect(() => {
+        if (!desktopOptionsProduct) {
+            return;
+        }
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeDesktopOptionsDrawer();
+            }
+        };
+
+        window.addEventListener('keydown', handleEscape);
+
+        return () => {
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [desktopOptionsProduct]);
+
     if (selectedVertical === 'daily_fresh') {
         return (
             <UserLayout>
                 <Head title="FreshTick - Daily Fresh" />
 
-                {mobileCategories.length > 0 && (
-                    <section className="bg-white py-2 lg:hidden">
-                        <div className="container mx-auto px-3">
-                            <h2 className="mb-2 text-base font-bold text-gray-900">Shop by Category</h2>
-                            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-                                {mobileCategories.map((category) => (
-                                    <Link
-                                        key={category.id}
-                                        href={`/categories/${category.slug}?vertical=daily_fresh`}
-                                        className="w-22 shrink-0 rounded-xl p-1.5 text-center"
-                                    >
-                                        <img
-                                            src={getSafeUrl(category.image)}
-                                            alt={category.name}
-                                            className="mx-auto h-14 w-14 rounded-lg object-cover"
-                                            loading="lazy"
-                                            onError={(event) => {
-                                                (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
-                                            }}
-                                        />
-                                        <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-medium text-gray-800">{category.name}</p>
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    </section>
-                )}
+                {mobileCategories.length > 0 && renderMobileCategorySection(mobileCategories, 'daily_fresh')}
 
-                <HeroBanner banners={banners} autoPlay={true} interval={5000} />
+                <HeroBanner banners={heroBanners} autoPlay={true} interval={5000} />
+
+                {renderDesktopCategorySection(dailyCategories, 'daily_fresh')}
+
+                {renderDesktopTopPicks()}
 
                 {renderMobilePostBannerCards()}
 
-                <DailyHomeSections />
+                {renderPromotionalBannerSection()}
+
+                {renderCouponOffersSection()}
+
+                {renderDailyCustomerFavouritesSection()}
+
+                {renderDailyBestSellersSection()}
+
+                {renderDesktopOptionsDrawer()}
 
                 {renderMobileOptionsDrawer()}
             </UserLayout>
@@ -696,66 +1563,23 @@ export default function Home({ banners, categories, products = [], subscriptionP
         <UserLayout>
             <Head title="FreshTick - Fresh Dairy Delivered Daily" />
 
-            {mobileCategories.length > 0 && (
-                <section className="bg-white py-2 lg:hidden">
-                    <div className="container mx-auto px-3">
-                        <h2 className="mb-2 text-base font-bold text-gray-900">Shop by Category</h2>
-                        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-                            {mobileCategories.map((category) => (
-                                <Link
-                                    key={category.id}
-                                    href={`/categories/${category.slug}?vertical=society_fresh`}
-                                    className="w-22 shrink-0 rounded-xl p-1.5 text-center"
-                                >
-                                    <img
-                                        src={getSafeUrl(category.image)}
-                                        alt={category.name}
-                                        className="mx-auto h-14 w-14 rounded-lg object-cover"
-                                        loading="lazy"
-                                        onError={(event) => {
-                                            (event.target as HTMLImageElement).src = DEFAULT_IMAGE_FALLBACK;
-                                        }}
-                                    />
-                                    <p className="mt-1 line-clamp-2 text-[10px] leading-tight font-medium text-gray-800">{category.name}</p>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            )}
+            {mobileCategories.length > 0 && renderMobileCategorySection(mobileCategories, 'society_fresh')}
 
             {/* Hero Banner Section - Compact with thumbnails */}
-            <HeroBanner banners={banners} autoPlay={true} interval={5000} />
+            <HeroBanner banners={heroBanners} autoPlay={true} interval={5000} />
+
+            {renderDesktopCategorySection(societyCategories, 'society_fresh')}
+
+            {renderDesktopTopPicks()}
 
             {renderMobilePostBannerCards()}
 
+            {renderPromotionalBannerSection()}
+
+            {renderCouponOffersSection()}
+
             <SocietyHomeSections>
-                <SocietyDeliveryMarqueeSection />
-
-                <SocietyCategoriesSection
-                    categories={societyCategories}
-                    categorySliderRef={categorySliderRef}
-                    categoryActivePage={categoryActivePage}
-                    setCategoryActivePage={setCategoryActivePage}
-                />
-
                 <SocietySubscriptionStepsSection />
-
-                <SocietyProductsSection
-                    products={products}
-                    wishlistedProductIds={wishlistedProductIds}
-                    productSliderRef={productSliderRef}
-                    productActivePage={productActivePage}
-                    setProductActivePage={setProductActivePage}
-                    setSelectedVariants={setSelectedVariants}
-                    similarCardMediaIndex={similarCardMediaIndex}
-                    setSimilarCardMediaIndexForKey={setSimilarCardMediaIndexForKey}
-                    toggleProductWishlist={toggleProductWishlist}
-                    getDisplayPrice={getDisplayPrice}
-                    getSelectedVariantId={getSelectedVariantId}
-                    getSafeUrl={getSafeUrl}
-                    formatPrice={formatPrice}
-                />
 
                 {/* Why Choose Us – Auto-scrolling Slider with Consistent Pattern */}
                 <section className="bg-linear-to-b from-white via-gray-50/50 to-white py-10 sm:py-12 lg:py-14" aria-labelledby="why-choose-heading">
@@ -1644,6 +2468,8 @@ export default function Home({ banners, categories, products = [], subscriptionP
                     </div>
                 </section>
             </SocietyHomeSections>
+
+            {renderDesktopOptionsDrawer()}
 
             {renderMobileOptionsDrawer()}
         </UserLayout>

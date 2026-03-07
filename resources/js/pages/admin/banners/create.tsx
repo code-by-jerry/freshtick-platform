@@ -13,6 +13,7 @@ interface Zone {
 interface AdminBannersCreateProps {
     typeOptions: Record<string, string>;
     linkTypeOptions: Record<string, string>;
+    verticalOptions: Record<string, string>;
     zones: Zone[];
 }
 
@@ -31,7 +32,7 @@ const inputCls =
     'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-(--admin-dark-primary) focus:ring-1 focus:ring-(--admin-dark-primary)';
 const labelCls = 'block text-sm font-medium text-gray-700';
 
-export default function AdminBannersCreate({ typeOptions, linkTypeOptions, zones }: AdminBannersCreateProps) {
+export default function AdminBannersCreate({ typeOptions, linkTypeOptions, verticalOptions, zones }: AdminBannersCreateProps) {
     const { csrf_token: csrfToken } = (usePage().props as unknown as SharedData) ?? {};
     const fallbackImage = FALLBACK_IMAGE_URL;
     const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export default function AdminBannersCreate({ typeOptions, linkTypeOptions, zones
     const form = useForm({
         name: '',
         type: 'home',
+        vertical: 'both',
         title: '',
         description: '',
         image: '',
@@ -182,6 +184,17 @@ export default function AdminBannersCreate({ typeOptions, linkTypeOptions, zones
                             </select>
                             {form.errors.type && <p className="mt-1 text-sm text-red-600">{form.errors.type}</p>}
                         </div>
+                    </div>
+                    <div>
+                        <label className={labelCls}>Vertical *</label>
+                        <select className={inputCls} value={form.data.vertical} onChange={(e) => form.setData('vertical', e.target.value)}>
+                            {Object.entries(verticalOptions).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
+                        {form.errors.vertical && <p className="mt-1 text-sm text-red-600">{form.errors.vertical}</p>}
                     </div>
                     <div className="grid gap-5 sm:grid-cols-2">
                         <div>

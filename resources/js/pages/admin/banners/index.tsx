@@ -8,6 +8,7 @@ interface Banner {
     id: number;
     name: string;
     type: string;
+    vertical: string;
     image: string;
     is_active: boolean;
     display_order: number;
@@ -23,11 +24,12 @@ interface PaginatedBanners {
 
 interface Props {
     banners: PaginatedBanners;
-    filters: { search?: string; type?: string; status?: string };
+    filters: { search?: string; type?: string; status?: string; vertical?: string };
     typeOptions: Record<string, string>;
+    verticalOptions: Record<string, string>;
 }
 
-export default function BannersIndex({ banners, filters, typeOptions }: Props) {
+export default function BannersIndex({ banners, filters, typeOptions, verticalOptions }: Props) {
     const [search, setSearch] = useState(filters.search || '');
 
     const handleSearch = (e: React.FormEvent) => {
@@ -86,6 +88,19 @@ export default function BannersIndex({ banners, filters, typeOptions }: Props) {
                                 </option>
                             ))}
                         </select>
+                        <select
+                            value={filters.vertical || ''}
+                            onChange={(e) =>
+                                router.get('/admin/banners', { ...filters, vertical: e.target.value || undefined }, { preserveState: true })
+                            }
+                            className="rounded-lg border border-gray-300 px-4 py-2"
+                        >
+                            {Object.entries(verticalOptions).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
                         <button type="submit" className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white">
                             Search
                         </button>
@@ -109,6 +124,7 @@ export default function BannersIndex({ banners, filters, typeOptions }: Props) {
                                     <div>
                                         <h3 className="font-medium text-gray-900">{banner.name}</h3>
                                         <p className="text-sm text-gray-500 capitalize">{typeOptions[banner.type] || banner.type}</p>
+                                        <p className="text-xs text-gray-400 capitalize">{verticalOptions[banner.vertical] || banner.vertical}</p>
                                     </div>
                                     <button onClick={() => handleToggle(banner.id)} className={banner.is_active ? 'text-green-600' : 'text-gray-400'}>
                                         {banner.is_active ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BusinessVertical;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ class Banner extends Model
     public const TYPE_PRODUCT = 'product';
 
     public const TYPE_PROMOTIONAL = 'promotional';
+
+    public const VERTICAL_BOTH = 'both';
 
     public const LINK_PRODUCT = 'product';
 
@@ -34,6 +37,7 @@ class Banner extends Model
     protected $fillable = [
         'name',
         'type',
+        'vertical',
         'title',
         'description',
         'image',
@@ -87,6 +91,17 @@ class Banner extends Model
     public function scopeByType($query, string $type)
     {
         return $query->where('type', $type);
+    }
+
+    public function scopeForVertical($query, string $vertical)
+    {
+        if ($vertical === 'all') {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($vertical) {
+            $q->where('vertical', $vertical)->orWhere('vertical', self::VERTICAL_BOTH);
+        });
     }
 
     public function scopeByZone($query, ?int $zoneId)
@@ -193,5 +208,17 @@ class Banner extends Model
             self::LINK_COLLECTION => 'Collection',
             self::LINK_EXTERNAL => 'External URL',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function verticalOptions(bool $withBoth = true): array
+    {
+        if ($withBoth) {
+            return array_merge([self::VERTICAL_BOTH => 'Both'], BusinessVertical::options());
+        }
+
+        return BusinessVertical::options();
     }
 }

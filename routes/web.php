@@ -6,6 +6,7 @@
 |--------------------------------------------------------------------------
 */
 
+use App\Enums\BusinessVertical;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\BottleController;
@@ -24,12 +25,19 @@ use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\ZoneController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
+Route::get('/', function (Request $request) {
+    $vertical = $request->string('vertical', BusinessVertical::DailyFresh->value)->toString();
+    if (! in_array($vertical, BusinessVertical::values(), true)) {
+        $vertical = BusinessVertical::DailyFresh->value;
+    }
+
     $banners = \App\Models\Banner::current()
         ->byType(\App\Models\Banner::TYPE_HOME)
+        ->forVertical($vertical)
         ->ordered()
         ->get()
         ->map(fn (\App\Models\Banner $banner) => [
@@ -40,17 +48,72 @@ Route::get('/', function () {
             'mobile_image' => $banner->getMobileImageUrl(),
             'link' => $banner->getLink(),
             'link_type' => $banner->link_type,
+            'vertical' => $banner->vertical,
         ]);
 
-    $categories = \App\Models\Category::active()
+    $promotionalBanners = \App\Models\Banner::current()
+        ->byType(\App\Models\Banner::TYPE_PROMOTIONAL)
+        ->forVertical($vertical)
         ->ordered()
         ->get()
+        ->map(fn (\App\Models\Banner $banner) => [
+            'id' => $banner->id,
+            'title' => $banner->title,
+            'description' => $banner->description,
+            'image' => $banner->getImageUrl(),
+            'mobile_image' => $banner->getMobileImageUrl(),
+            'link' => $banner->getLink(),
+            'link_type' => $banner->link_type,
+            'vertical' => $banner->vertical,
+        ]);
+
+    $rawCategories = \App\Models\Category::active()
+        ->ordered()
+        ->get();
+
+    $verticalCategoryIds = $rawCategories
+        ->filter(fn (\App\Models\Category $category) => in_array($category->vertical, [$vertical, \App\Models\Category::VERTICAL_BOTH], true))
+        ->pluck('id')
+        ->map(fn (int $id) => (int) $id)
+        ->all();
+
+    $categories = $rawCategories
         ->map(fn (\App\Models\Category $category) => [
             'id' => $category->id,
             'name' => $category->name,
             'slug' => $category->slug,
             'image' => $category->image,
             'vertical' => $category->vertical,
+        ]);
+
+    $coupons = \App\Models\Coupon::query()
+        ->valid()
+        ->orderByDesc('value')
+        ->limit(12)
+        ->get()
+        ->filter(function (\App\Models\Coupon $coupon) use ($verticalCategoryIds) {
+            if ($coupon->applicable_to === \App\Models\Coupon::APPLICABLE_ALL || empty($coupon->applicable_ids)) {
+                return true;
+            }
+
+            if ($coupon->applicable_to === \App\Models\Coupon::APPLICABLE_CATEGORIES) {
+                $couponCategoryIds = array_map('intval', $coupon->applicable_ids ?? []);
+
+                return count(array_intersect($verticalCategoryIds, $couponCategoryIds)) > 0;
+            }
+
+            return false;
+        })
+        ->values()
+        ->map(fn (\App\Models\Coupon $coupon) => [
+            'id' => $coupon->id,
+            'code' => $coupon->code,
+            'name' => $coupon->name,
+            'discount_label' => $coupon->getDiscountLabel(),
+            'type' => $coupon->type,
+            'value' => (float) $coupon->value,
+            'min_order_amount' => $coupon->min_order_amount ? (float) $coupon->min_order_amount : null,
+            'max_discount' => $coupon->max_discount ? (float) $coupon->max_discount : null,
         ]);
 
     $products = \App\Models\Product::with('variants')
@@ -62,6 +125,7 @@ Route::get('/', function () {
             'id' => $product->id,
             'name' => $product->name,
             'slug' => $product->slug,
+            'category_id' => $product->category_id,
             'image' => $product->image,
             'short_description' => $product->short_description,
             'price' => (float) $product->price,
@@ -103,8 +167,64 @@ Route::get('/', function () {
             ]),
         ]);
 
+    $customerFavouritesCollection = null;
+    if ($vertical === BusinessVertical::DailyFresh->value) {
+        $collection = \App\Models\Collection::query()
+            ->active()
+            ->current()
+            ->forVertical($vertical)
+            ->where(function ($query) {
+                $query->where('slug', 'customer-favourites-daily-fresh')
+                    ->orWhere('name', 'Customer Favourites - daily fresh')
+                    ->orWhereRaw('LOWER(slug) LIKE ?', ['%favourite%'])
+                    ->orWhereRaw('LOWER(slug) LIKE ?', ['%favorite%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%favourite%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%favorite%']);
+            })
+            ->ordered()
+            ->first();
+
+        if ($collection !== null) {
+            $collectionProducts = $collection->configuredProductsQuery($vertical)
+                ->with('variants')
+                ->limit(12)
+                ->get()
+                ->map(fn (\App\Models\Product $product) => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'slug' => $product->slug,
+                    'category_id' => $product->category_id,
+                    'image' => $product->image,
+                    'short_description' => $product->short_description,
+                    'price' => (float) $product->price,
+                    'compare_at_price' => $product->compare_at_price ? (float) $product->compare_at_price : null,
+                    'is_subscription_eligible' => (bool) $product->is_subscription_eligible,
+                    'unit' => $product->unit,
+                    'weight' => $product->weight ? (float) $product->weight : null,
+                    'variants' => $product->variants->map(fn ($variant) => [
+                        'id' => $variant->id,
+                        'name' => $variant->name,
+                        'price' => (float) $variant->price,
+                        'is_active' => $variant->is_active,
+                    ])->values(),
+                ])
+                ->values();
+
+            $customerFavouritesCollection = [
+                'id' => $collection->id,
+                'slug' => $collection->slug,
+                'banner_image' => $collection->banner_image,
+                'banner_mobile_image' => $collection->banner_mobile_image,
+                'products' => $collectionProducts,
+            ];
+        }
+    }
+
     return Inertia::render('home', [
         'banners' => $banners,
+        'promotionalBanners' => $promotionalBanners,
+        'coupons' => $coupons,
+        'customerFavouritesCollection' => $customerFavouritesCollection,
         'categories' => $categories,
         'products' => $products,
         'subscriptionPlans' => $subscriptionPlans,

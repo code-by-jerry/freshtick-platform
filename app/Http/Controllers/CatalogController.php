@@ -119,12 +119,17 @@ class CatalogController extends Controller
             abort(404);
         }
 
+        $products = $collection->configuredProductsQuery($vertical)
+            ->whereHas('zones', function ($query) use ($zone) {
+                $query->where('zones.id', $zone->id)->where('product_zones.is_available', true);
+            })
+            ->with(['category:id,name,slug', 'collection:id,name,slug', 'variants'])
+            ->get();
+
         $filters = [
             'collection_id' => $collection->id,
             'sort' => $request->string('sort', 'display_order')->toString(),
         ];
-
-        $products = $this->catalogService->getProductsForZone($zone, $vertical, $filters);
 
         return Inertia::render('catalog/collection', [
             'collection' => $collection,

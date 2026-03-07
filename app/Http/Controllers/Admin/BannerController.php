@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\BusinessVertical;
 use App\Http\Controllers\Controller;
 use App\Models\Banner;
 use App\Models\Zone;
 use App\Traits\HandlesImageUploads;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,6 +32,11 @@ class BannerController extends Controller
             $query->byType($request->type);
         }
 
+        $vertical = $request->string('vertical')->toString();
+        if ($vertical !== '' && in_array($vertical, array_merge(BusinessVertical::values(), [Banner::VERTICAL_BOTH]), true)) {
+            $query->where('vertical', $vertical);
+        }
+
         if ($request->filled('status')) {
             if ($request->status === 'active') {
                 $query->active();
@@ -42,8 +49,9 @@ class BannerController extends Controller
 
         return Inertia::render('admin/banners/index', [
             'banners' => $banners,
-            'filters' => $request->only(['search', 'type', 'status']),
+            'filters' => array_merge($request->only(['search', 'type', 'status']), ['vertical' => $vertical]),
             'typeOptions' => Banner::typeOptions(),
+            'verticalOptions' => array_merge(['' => 'All verticals'], Banner::verticalOptions()),
         ]);
     }
 
@@ -55,6 +63,7 @@ class BannerController extends Controller
         return Inertia::render('admin/banners/create', [
             'typeOptions' => Banner::typeOptions(),
             'linkTypeOptions' => Banner::linkTypeOptions(),
+            'verticalOptions' => Banner::verticalOptions(),
             'zones' => Zone::active()->select('id', 'name')->get(),
         ]);
     }
@@ -67,6 +76,7 @@ class BannerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:home,category,product,promotional'],
+            'vertical' => ['required', 'string', Rule::in(array_merge(BusinessVertical::values(), [Banner::VERTICAL_BOTH]))],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'image' => ['required', 'string', 'url'],
@@ -131,6 +141,7 @@ class BannerController extends Controller
             'banner' => $banner,
             'typeOptions' => Banner::typeOptions(),
             'linkTypeOptions' => Banner::linkTypeOptions(),
+            'verticalOptions' => Banner::verticalOptions(),
             'zones' => Zone::active()->select('id', 'name')->get(),
         ]);
     }
@@ -143,6 +154,7 @@ class BannerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:home,category,product,promotional'],
+            'vertical' => ['required', 'string', Rule::in(array_merge(BusinessVertical::values(), [Banner::VERTICAL_BOTH]))],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'image' => ['required', 'string', 'url'],

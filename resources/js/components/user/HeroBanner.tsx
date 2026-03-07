@@ -16,9 +16,10 @@ interface HeroBannerProps {
     banners: Banner[];
     autoPlay?: boolean;
     interval?: number;
+    variant?: 'hero' | 'promo';
 }
 
-export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }: HeroBannerProps) {
+export default function HeroBanner({ banners, autoPlay = true, interval = 4000, variant = 'hero' }: HeroBannerProps) {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
 
@@ -51,9 +52,10 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
     const goToSlide = (index: number) => setCurrentSlide(index);
     const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % displayBanners.length);
     const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + displayBanners.length) % displayBanners.length);
+    const sectionPaddingClass = variant === 'hero' ? 'pt-0 sm:pt-0 lg:pt-23' : 'pt-0';
 
     return (
-        <section className="relative w-full pt-0 sm:pt-0 lg:pt-23">
+        <section className={`relative w-full ${sectionPaddingClass}`}>
             {/* Mobile: Simple auto-height banner without thumbnails */}
             <div className="h-auto w-full px-1 lg:hidden">
                 <div
@@ -112,7 +114,9 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                     {displayBanners.map((banner, index) => (
                         <div
                             key={banner.id}
-                            className={`relative transition-opacity duration-500 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
+                            className={`transition-opacity duration-500 ease-in-out ${
+                                index === currentSlide ? 'block opacity-100' : 'hidden opacity-0'
+                            }`}
                         >
                             {banner.link ? (
                                 <Link href={banner.link} className="block w-full">
@@ -152,31 +156,6 @@ export default function HeroBanner({ banners, autoPlay = true, interval = 4000 }
                                 <ChevronRight className="h-5 w-5 text-gray-700" />
                             </button>
                         </>
-                    )}
-
-                    {/* Thumbnails - Bottom Right on Image */}
-                    {displayBanners.length > 1 && (
-                        <div className="absolute right-4 bottom-4 z-20 flex gap-2">
-                            {displayBanners.map((banner, index) => (
-                                <button
-                                    key={banner.id}
-                                    onClick={() => goToSlide(index)}
-                                    className={`relative overflow-hidden rounded-lg transition-all duration-200 ${
-                                        index === currentSlide ? 'ring-2 ring-white ring-offset-1' : 'opacity-70 hover:opacity-100'
-                                    }`}
-                                    aria-label={`View ${banner.title || 'banner'} ${index + 1}`}
-                                >
-                                    <div className="h-14 w-20">
-                                        <img
-                                            src={banner.image}
-                                            alt={banner.title || `Thumbnail ${index + 1}`}
-                                            className="h-full w-full object-cover"
-                                            loading="lazy"
-                                        />
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
                     )}
                 </div>
             </div>

@@ -23,8 +23,12 @@ interface CollectionData {
     description: string | null;
     vertical: string;
     is_active: boolean;
+    products_count: number;
+    product_selection_label?: string;
+    category_selection_label?: string;
     banner_image: string;
     category?: CategoryRef | null;
+    configured_categories?: CategoryRef[];
     products?: ProductSummary[];
 }
 
@@ -59,7 +63,19 @@ export default function AdminCollectionsShow({ collection }: AdminCollectionsSho
                         </div>
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Category</dt>
-                            <dd className="mt-0.5 text-sm text-gray-900">{collection.category?.name ?? '—'}</dd>
+                            <dd className="mt-0.5 text-sm text-gray-900">
+                                {collection.configured_categories && collection.configured_categories.length > 0
+                                    ? collection.configured_categories.map((item) => item.name).join(', ')
+                                    : (collection.category?.name ?? 'All')}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm font-medium text-gray-500">Category mode</dt>
+                            <dd className="mt-0.5 text-sm text-gray-900">{collection.category_selection_label ?? 'All categories'}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm font-medium text-gray-500">Product mode</dt>
+                            <dd className="mt-0.5 text-sm text-gray-900">{collection.product_selection_label ?? 'Category wise'}</dd>
                         </div>
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Vertical</dt>
@@ -68,6 +84,10 @@ export default function AdminCollectionsShow({ collection }: AdminCollectionsSho
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Status</dt>
                             <dd className="mt-0.5 text-sm text-gray-900">{collection.is_active ? 'Active' : 'Inactive'}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm font-medium text-gray-500">Products count</dt>
+                            <dd className="mt-0.5 text-sm text-gray-900">{collection.products_count}</dd>
                         </div>
                         {collection.description && (
                             <div className="sm:col-span-2">

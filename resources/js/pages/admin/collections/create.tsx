@@ -12,9 +12,19 @@ interface CategoryOption {
     slug: string;
 }
 
+interface ProductOption {
+    id: number;
+    name: string;
+    slug: string;
+    category_id: number | null;
+}
+
 interface AdminCollectionsCreateProps {
     verticalOptions: Record<string, string>;
     categories: CategoryOption[];
+    products: ProductOption[];
+    productSelectionOptions: Record<string, string>;
+    categorySelectionOptions: Record<string, string>;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -28,7 +38,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-export default function AdminCollectionsCreate({ verticalOptions, categories }: AdminCollectionsCreateProps) {
+export default function AdminCollectionsCreate({
+    verticalOptions,
+    categories,
+    products,
+    productSelectionOptions,
+    categorySelectionOptions,
+}: AdminCollectionsCreateProps) {
     const { csrf_token: csrfToken } = (usePage().props as unknown as SharedData) ?? {};
     const fallbackImage = FALLBACK_IMAGE_URL;
     const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
@@ -44,6 +60,11 @@ export default function AdminCollectionsCreate({ verticalOptions, categories }: 
         slug: '',
         description: '',
         category_id: null as number | null,
+        product_selection_mode: 'category',
+        category_selection_mode: 'all',
+        category_ids: [] as number[],
+        product_ids: [] as number[],
+        random_products_limit: 12,
         banner_image: '',
         banner_mobile_image: '',
         display_order: 0,
@@ -85,6 +106,37 @@ export default function AdminCollectionsCreate({ verticalOptions, categories }: 
     const inputCls =
         'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-(--admin-dark-primary) focus:ring-1 focus:ring-(--admin-dark-primary)';
     const labelCls = 'block text-sm font-medium text-gray-700';
+    const selectedCategoryIds = new Set(form.data.category_ids);
+    const filteredProducts =
+        form.data.category_selection_mode === 'selected' && selectedCategoryIds.size > 0
+            ? products.filter((product) => product.category_id !== null && selectedCategoryIds.has(product.category_id))
+            : products;
+
+    const toggleCategory = (categoryId: number) => {
+        if (selectedCategoryIds.has(categoryId)) {
+            form.setData(
+                'category_ids',
+                form.data.category_ids.filter((id) => id !== categoryId),
+            );
+            return;
+        }
+
+        form.setData('category_ids', [...form.data.category_ids, categoryId]);
+    };
+
+    const selectedProductIds = new Set(form.data.product_ids);
+
+    const toggleProduct = (productId: number) => {
+        if (selectedProductIds.has(productId)) {
+            form.setData(
+                'product_ids',
+                form.data.product_ids.filter((id) => id !== productId),
+            );
+            return;
+        }
+
+        form.setData('product_ids', [...form.data.product_ids, productId]);
+    };
 
     return (
         <AdminLayout title="Add collection">
@@ -150,6 +202,108 @@ export default function AdminCollectionsCreate({ verticalOptions, categories }: 
                             onChange={(e) => form.setData('description', e.target.value)}
                         />
                     </div>
+                </Section>
+
+                <Section title="Collection setup">
+                    <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                            <label className={labelCls}>Product mode</label>
+                            <select
+                                className={inputCls}
+                                value={form.data.product_selection_mode}
+                                onChange={(e) => form.setData('product_selection_mode', e.target.value as 'category' | 'manual' | 'random')}
+                            >
+                                {Object.entries(productSelectionOptions).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+                            {form.errors.product_selection_mode && <p className="mt-1 text-sm text-red-600">{form.errors.product_selection_mode}</p>}
+                        </div>
+                        <div>
+                            <label className={labelCls}>Category mode</label>
+                            <select
+                                className={inputCls}
+                                value={form.data.category_selection_mode}
+                                onChange={(e) => form.setData('category_selection_mode', e.target.value as 'all' | 'selected')}
+                            >
+                                {Object.entries(categorySelectionOptions).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+                            {form.errors.category_selection_mode && (
+                                <p className="mt-1 text-sm text-red-600">{form.errors.category_selection_mode}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {form.data.category_selection_mode === 'selected' && (
+                        <div>
+                            <label className={labelCls}>Select categories</label>
+                            <div className="mt-2 grid max-h-56 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                                {categories.map((category) => (
+                                    <label
+                                        key={category.id}
+                                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-50"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedCategoryIds.has(category.id)}
+                                            onChange={() => toggleCategory(category.id)}
+                                            className="h-4 w-4 rounded border-gray-300"
+                                        />
+                                        <span>{category.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            {form.errors.category_ids && <p className="mt-1 text-sm text-red-600">{form.errors.category_ids}</p>}
+                        </div>
+                    )}
+
+                    {form.data.product_selection_mode === 'manual' && (
+                        <div>
+                            <label className={labelCls}>Select products</label>
+                            <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-gray-200">
+                                {filteredProducts.length === 0 ? (
+                                    <p className="px-3 py-2 text-sm text-gray-500">No products available for current category filter.</p>
+                                ) : (
+                                    filteredProducts.map((product) => (
+                                        <label
+                                            key={product.id}
+                                            className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 hover:bg-gray-50"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedProductIds.has(product.id)}
+                                                onChange={() => toggleProduct(product.id)}
+                                                className="h-4 w-4 rounded border-gray-300"
+                                            />
+                                            <span className="truncate">{product.name}</span>
+                                        </label>
+                                    ))
+                                )}
+                            </div>
+                            {form.errors.product_ids && <p className="mt-1 text-sm text-red-600">{form.errors.product_ids}</p>}
+                        </div>
+                    )}
+
+                    {form.data.product_selection_mode === 'random' && (
+                        <div>
+                            <label className={labelCls}>Random products limit</label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                className={inputCls}
+                                value={form.data.random_products_limit}
+                                onChange={(e) => form.setData('random_products_limit', Number(e.target.value) || 1)}
+                            />
+                            {form.errors.random_products_limit && <p className="mt-1 text-sm text-red-600">{form.errors.random_products_limit}</p>}
+                        </div>
+                    )}
                 </Section>
 
                 {/* ── Banner images ─────────────────────────── */}
