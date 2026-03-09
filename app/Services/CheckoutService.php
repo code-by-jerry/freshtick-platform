@@ -29,7 +29,7 @@ class CheckoutService
      * Process checkout and create order
      *
      * @param  array<string, mixed>  $data
-     * @return array{success: bool, order?: Order, error?: string}
+     * @return array{success: bool, order?: Order, payment?: Payment|null, gateway_data?: array<string, mixed>|null, error?: string}
      */
     public function processCheckout(
         Cart $cart,
@@ -81,6 +81,7 @@ class CheckoutService
                     'success' => true,
                     'order' => $order,
                     'payment' => $paymentResult['payment'] ?? null,
+                    'gateway_data' => $paymentResult['gateway_data'] ?? null,
                 ];
             });
         } catch (\Exception $e) {
@@ -190,7 +191,7 @@ class CheckoutService
     /**
      * Process payment for order
      *
-     * @return array{success: bool, payment?: Payment, error?: string}
+     * @return array{success: bool, payment?: Payment, gateway_data?: array<string, mixed>, error?: string}
      */
     protected function processPaymentForOrder(Order $order, User $user, string $paymentMethod): array
     {
@@ -237,20 +238,25 @@ class CheckoutService
         }
 
         // Online payment (gateway/upi)
-        $payment = Payment::create([
-            'order_id' => $order->id,
-            'user_id' => $user->id,
-            'amount' => $total,
-            'currency' => 'INR',
-            'method' => Payment::METHOD_GATEWAY,
-            'gateway' => 'razorpay', // Default gateway
-            'status' => Payment::STATUS_PENDING,
+        $order->update([
+            'payment_method' => $paymentMethod,
+            'status' => Order::STATUS_PENDING,
         ]);
 
-        // TODO: Initiate gateway payment and return redirect URL
-        // For now, mock as pending - actual integration would redirect to gateway
+        $gatewayResult = $this->paymentService->initiateGatewayPayment($order, 'razorpay');
 
-        return ['success' => true, 'payment' => $payment, 'requires_redirect' => true];
+        if (! $gatewayResult['success']) {
+            return [
+                'success' => false,
+                'error' => $gatewayResult['error'] ?? 'Failed to initiate online payment.',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'payment' => $gatewayResult['payment'],
+            'gateway_data' => $gatewayResult['gateway_data'] ?? [],
+        ];
     }
 
     /**

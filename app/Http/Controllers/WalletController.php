@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WalletTransaction;
+use App\Services\Gateways\RazorpayGateway;
 use App\Services\PaymentService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,8 @@ class WalletController extends Controller
 {
     public function __construct(
         private WalletService $walletService,
-        private PaymentService $paymentService
+        private PaymentService $paymentService,
+        private RazorpayGateway $razorpayGateway
     ) {}
 
     /**
@@ -59,6 +61,14 @@ class WalletController extends Controller
      */
     public function recharge(Request $request): RedirectResponse|JsonResponse
     {
+        return $this->initiateRecharge($request);
+    }
+
+    /**
+     * Initiate wallet recharge via Razorpay.
+     */
+    public function initiateRecharge(Request $request): JsonResponse
+    {
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:10', 'max:50000'],
             'payment_method' => ['required', 'string', 'in:gateway,upi'],
@@ -66,18 +76,134 @@ class WalletController extends Controller
 
         $user = $request->user();
         $wallet = $this->walletService->getOrCreateWallet($user);
+        $amount = (float) $validated['amount'];
 
-        // TODO: Process payment via gateway
-        // For now, mock successful recharge
-        $result = $this->walletService->recharge($wallet, $validated['amount']);
+        if (! config('payment.gateways.razorpay.key_id') || ! config('payment.gateways.razorpay.key_secret')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Razorpay keys are not configured.',
+            ], 422);
+        }
 
-        if (! $result['success']) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => $result['error']], 422);
+        if (config('payment.mock', false)) {
+            $result = $this->walletService->recharge($wallet, $amount);
+
+            if (! $result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'],
+                ], 422);
             }
 
-            return back()->withErrors(['amount' => $result['error']]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Wallet recharged successfully.',
+                'balance' => $wallet->fresh()->balance,
+                'mock' => true,
+            ]);
         }
+
+        $receipt = sprintf('WLT-%d-%s', $user->id, now()->format('YmdHis'));
+        $orderResult = $this->razorpayGateway->createGenericOrder(
+            amount: $amount,
+            receipt: $receipt,
+            notes: [
+                'purpose' => 'wallet_recharge',
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'payment_method' => $validated['payment_method'],
+            ]
+        );
+
+        if (! $orderResult['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $orderResult['error'] ?? 'Unable to initiate wallet recharge.',
+            ], 422);
+        }
+
+        $checkoutOptions = $this->razorpayGateway->getGenericCheckoutOptions(
+            amount: $amount,
+            description: 'Wallet Recharge',
+            gatewayOrderId: $orderResult['order_id'],
+            prefill: [
+                'name' => $user->name,
+                'email' => $user->email,
+                'contact' => $user->phone,
+            ],
+            notes: [
+                'purpose' => 'wallet_recharge',
+                'wallet_id' => (string) $wallet->id,
+            ]
+        );
+
+        $request->session()->put('wallet_recharge_pending', [
+            'order_id' => $orderResult['order_id'],
+            'wallet_id' => $wallet->id,
+            'amount' => $amount,
+            'created_at' => now()->toISOString(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'gateway' => 'razorpay',
+            'gateway_data' => $checkoutOptions,
+        ]);
+    }
+
+    /**
+     * Verify successful Razorpay wallet recharge and credit wallet.
+     */
+    public function verifyRecharge(Request $request): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'razorpay_order_id' => ['required', 'string'],
+            'razorpay_payment_id' => ['required', 'string'],
+            'razorpay_signature' => ['required', 'string'],
+        ]);
+
+        $pendingRecharge = $request->session()->get('wallet_recharge_pending');
+
+        if (! is_array($pendingRecharge) || ($pendingRecharge['order_id'] ?? null) !== $validated['razorpay_order_id']) {
+            $message = 'Recharge session expired. Please try again.';
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'error' => $message], 422);
+            }
+
+            return redirect()->route('wallet.recharge')->withErrors(['amount' => $message]);
+        }
+
+        $verifyResult = $this->razorpayGateway->verifyPayment(
+            $validated['razorpay_order_id'],
+            $validated['razorpay_payment_id'],
+            $validated['razorpay_signature']
+        );
+
+        if (! $verifyResult['success']) {
+            $message = 'Payment verification failed. Please contact support if money was debited.';
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'error' => $message], 422);
+            }
+
+            return redirect()->route('wallet.recharge')->withErrors(['amount' => $message]);
+        }
+
+        $wallet = $this->walletService->getOrCreateWallet($request->user());
+        $rechargeResult = $this->walletService->recharge($wallet, (float) $pendingRecharge['amount']);
+
+        if (! $rechargeResult['success']) {
+            $message = $rechargeResult['error'] ?? 'Recharge failed after successful payment.';
+
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'error' => $message], 422);
+            }
+
+            return redirect()->route('wallet.recharge')->withErrors(['amount' => $message]);
+        }
+
+        $request->session()->forget('wallet_recharge_pending');
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -87,8 +213,7 @@ class WalletController extends Controller
             ]);
         }
 
-        return redirect()->route('wallet.index')
-            ->with('success', "₹{$validated['amount']} added to your wallet.");
+        return redirect()->route('wallet.index')->with('success', 'Wallet recharged successfully.');
     }
 
     /**

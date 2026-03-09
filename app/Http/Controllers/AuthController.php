@@ -280,7 +280,7 @@ class AuthController extends Controller
         if (! $isValidOtp) {
             throw ValidationException::withMessages([
                 'otp' => ['Invalid or expired OTP. Please try again.'],
-            ])->redirectTo($request->url());
+            ]);
         }
 
         $user = User::query()->firstOrCreate(
@@ -323,7 +323,7 @@ class AuthController extends Controller
         if (! $isValidOtp) {
             throw ValidationException::withMessages([
                 'otp' => ['Invalid or expired OTP. Please try again.'],
-            ])->redirectTo($request->url());
+            ]);
         }
 
         /** @var User $currentUser */
@@ -337,7 +337,7 @@ class AuthController extends Controller
         if ($existingPhoneUser !== null) {
             throw ValidationException::withMessages([
                 'phone' => ['This phone number is already linked to another account.'],
-            ])->redirectTo($request->url());
+            ]);
         }
 
         $currentUser->update([

@@ -3,6 +3,14 @@ import { ChevronLeft, MapPin, Calendar, Clock, CreditCard, Truck, FileText, Shie
 import { useState } from 'react';
 import UserLayout from '@/layouts/UserLayout';
 
+declare global {
+    interface Window {
+        Razorpay?: new (options: Record<string, unknown>) => {
+            open: () => void;
+        };
+    }
+}
+
 interface Product {
     id: number;
     name: string;
@@ -71,8 +79,8 @@ interface CheckoutIndexProps {
 }
 
 const DELIVERY_SLOTS = [
-    { id: 'morning', label: 'Morning', time: '6 AM – 9 AM' },
-    { id: 'evening', label: 'Evening', time: '4 PM – 7 PM' },
+    { id: '06:00', label: 'Morning', time: '6 AM - 9 AM' },
+    { id: '16:00', label: 'Evening', time: '4 PM - 7 PM' },
 ] as const;
 
 type DeliverySlotId = (typeof DELIVERY_SLOTS)[number]['id'];
@@ -88,6 +96,8 @@ export default function CheckoutIndex({
     walletBalance,
 }: CheckoutIndexProps) {
     const [showAddAddress, setShowAddAddress] = useState(false);
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
+    const [isOnlineProcessing, setIsOnlineProcessing] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm<{
         user_address_id: number | null;
@@ -105,7 +115,157 @@ export default function CheckoutIndex({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/checkout');
+
+        if (data.payment_method === 'upi' || data.payment_method === 'gateway') {
+            setIsOnlineProcessing(true);
+            void startOnlineCheckout();
+
+            return;
+        }
+
+        post('/checkout', {
+            onError: () => {
+                setCheckoutError('Failed to place order. Please review details and try again.');
+            },
+        });
+    };
+
+    const getCsrfToken = (): string => {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        return token ?? '';
+    };
+
+    const loadRazorpayScript = async (): Promise<boolean> => {
+        if (window.Razorpay) {
+            return true;
+        }
+
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
+    const verifyOrderPayment = async (
+        razorpayOrderId: string,
+        razorpayPaymentId: string,
+        razorpaySignature: string,
+    ): Promise<{ redirect_url: string }> => {
+        const response = await fetch('/checkout/verify-payment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                razorpay_order_id: razorpayOrderId,
+                razorpay_payment_id: razorpayPaymentId,
+                razorpay_signature: razorpaySignature,
+            }),
+        });
+
+        const payload = (await response.json()) as {
+            success?: boolean;
+            error?: string;
+            redirect_url?: string;
+        };
+
+        if (!response.ok || !payload.success || !payload.redirect_url) {
+            throw new Error(payload.error ?? 'Unable to verify payment.');
+        }
+
+        return { redirect_url: payload.redirect_url };
+    };
+
+    const startOnlineCheckout = async (): Promise<void> => {
+        setCheckoutError(null);
+
+        const payload = {
+            user_address_id: data.user_address_id,
+            scheduled_delivery_date: data.scheduled_delivery_date,
+            scheduled_delivery_time: data.scheduled_delivery_time,
+            payment_method: data.payment_method,
+            delivery_instructions: data.delivery_instructions,
+        };
+
+        try {
+            const initiateResponse = await fetch('/checkout/initiate-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const initiatePayload = (await initiateResponse.json()) as {
+                success?: boolean;
+                error?: string;
+                message?: string;
+                errors?: Record<string, string[]>;
+                gateway_data?: Record<string, unknown>;
+            };
+
+            if (!initiateResponse.ok || !initiatePayload.success || !initiatePayload.gateway_data) {
+                const firstValidationError = initiatePayload.errors
+                    ? Object.values(initiatePayload.errors)
+                          .flat()
+                          .find((value) => value && value.length > 0)
+                    : undefined;
+
+                setCheckoutError(firstValidationError ?? initiatePayload.error ?? initiatePayload.message ?? 'Failed to start online payment.');
+                setIsOnlineProcessing(false);
+
+                return;
+            }
+
+            const loaded = await loadRazorpayScript();
+
+            if (!loaded || !window.Razorpay) {
+                setCheckoutError('Unable to load Razorpay checkout. Please try again.');
+                setIsOnlineProcessing(false);
+
+                return;
+            }
+
+            const razorpay = new window.Razorpay({
+                ...initiatePayload.gateway_data,
+                handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+                    try {
+                        const verification = await verifyOrderPayment(
+                            response.razorpay_order_id,
+                            response.razorpay_payment_id,
+                            response.razorpay_signature,
+                        );
+
+                        window.location.href = verification.redirect_url;
+                    } catch (verifyError) {
+                        setCheckoutError(verifyError instanceof Error ? verifyError.message : 'Payment verification failed.');
+                        setIsOnlineProcessing(false);
+                    }
+                },
+                modal: {
+                    ondismiss: () => {
+                        setCheckoutError('Payment was cancelled. You can retry anytime from checkout.');
+                        setIsOnlineProcessing(false);
+                    },
+                },
+            });
+
+            razorpay.open();
+        } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : 'Unable to process payment right now.');
+            setIsOnlineProcessing(false);
+        }
     };
 
     const selectedAddress = addresses.find((a) => a.id === data.user_address_id);
@@ -460,12 +620,21 @@ export default function CheckoutIndex({
                                             </div>
                                         )}
 
+                                        {checkoutError && (
+                                            <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                                                <p className="flex items-center gap-1.5">
+                                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                                    {checkoutError}
+                                                </p>
+                                            </div>
+                                        )}
+
                                         <button
                                             type="submit"
-                                            disabled={processing || !selectedAddress?.zone}
+                                            disabled={processing || isOnlineProcessing || !selectedAddress?.zone}
                                             className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            {processing ? (
+                                            {processing || isOnlineProcessing ? (
                                                 <>
                                                     <Loader2 className="h-5 w-5 animate-spin" />
                                                     Processing...
@@ -498,10 +667,10 @@ export default function CheckoutIndex({
                                 type="submit"
                                 form="checkout-form"
                                 onClick={handleSubmit}
-                                disabled={processing || !selectedAddress?.zone}
+                                disabled={processing || isOnlineProcessing || !selectedAddress?.zone}
                                 className="flex max-w-[200px] flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--theme-primary-1)] py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--theme-primary-1-dark)] focus:ring-2 focus:ring-[var(--theme-primary-1)] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Place Order'}
+                                {processing || isOnlineProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Place Order'}
                             </button>
                         </div>
                     </div>

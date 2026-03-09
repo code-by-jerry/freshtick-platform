@@ -413,6 +413,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/checkout', [OrderController::class, 'create'])->name('checkout');
     Route::post('/checkout', [OrderController::class, 'store'])->name('checkout.store');
+    Route::post('/checkout/initiate-payment', [OrderController::class, 'initiatePayment'])->name('checkout.initiate-payment');
+    Route::post('/checkout/verify-payment', [OrderController::class, 'verifyPayment'])->name('checkout.verify-payment');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
     Route::get('/orders/{order}/track', [OrderController::class, 'track'])->name('orders.track');
@@ -422,6 +424,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::get('/wallet/recharge', [WalletController::class, 'rechargeForm'])->name('wallet.recharge');
     Route::post('/wallet/recharge', [WalletController::class, 'recharge'])->name('wallet.recharge.store');
+    Route::post('/wallet/recharge/initiate', [WalletController::class, 'initiateRecharge'])->name('wallet.recharge.initiate');
+    Route::post('/wallet/recharge/verify', [WalletController::class, 'verifyRecharge'])->name('wallet.recharge.verify');
     Route::get('/wallet/transactions', [WalletController::class, 'transactions'])->name('wallet.transactions');
     Route::get('/wallet/balance', [WalletController::class, 'balance'])->name('wallet.balance');
     Route::get('/wallet/auto-recharge', [WalletController::class, 'autoRechargeSettings'])->name('wallet.auto-recharge');

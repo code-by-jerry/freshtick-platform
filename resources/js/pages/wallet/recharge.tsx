@@ -2,6 +2,14 @@ import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, CreditCard, Smartphone, Wallet as WalletIcon } from 'lucide-react';
 import { useState } from 'react';
 
+declare global {
+    interface Window {
+        Razorpay?: new (options: Record<string, unknown>) => {
+            open: () => void;
+        };
+    }
+}
+
 interface Wallet {
     id: number;
     balance: string;
@@ -44,22 +52,124 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
         setIsSubmitting(true);
         setError(null);
 
-        router.post(
-            '/wallet/recharge',
-            {
-                amount: numericAmount,
-                payment_method: paymentMethod,
+        void startRazorpayRecharge(numericAmount);
+    };
+
+    const getCsrfToken = (): string => {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        return token ?? '';
+    };
+
+    const loadRazorpayScript = async (): Promise<boolean> => {
+        if (window.Razorpay) {
+            return true;
+        }
+
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
+    const verifyRecharge = async (razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string): Promise<void> => {
+        const response = await fetch('/wallet/recharge/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
             },
-            {
-                onSuccess: () => {
-                    setIsSubmitting(false);
+            body: JSON.stringify({
+                razorpay_order_id: razorpayOrderId,
+                razorpay_payment_id: razorpayPaymentId,
+                razorpay_signature: razorpaySignature,
+            }),
+        });
+
+        const payload = (await response.json()) as { success?: boolean; error?: string };
+
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.error ?? 'Failed to verify payment.');
+        }
+    };
+
+    const startRazorpayRecharge = async (numericAmount: number): Promise<void> => {
+        try {
+            const initiateResponse = await fetch('/wallet/recharge/initiate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
                 },
-                onError: (errors) => {
-                    setIsSubmitting(false);
-                    setError(errors.amount || 'Failed to process recharge');
-                },
+                body: JSON.stringify({
+                    amount: numericAmount,
+                    payment_method: paymentMethod,
+                }),
+            });
+
+            const initiatePayload = (await initiateResponse.json()) as {
+                success?: boolean;
+                error?: string;
+                mock?: boolean;
+                gateway_data?: Record<string, unknown>;
+            };
+
+            if (!initiateResponse.ok || !initiatePayload.success) {
+                setError(initiatePayload.error ?? 'Failed to initiate payment');
+                setIsSubmitting(false);
+
+                return;
             }
-        );
+
+            if (initiatePayload.mock) {
+                setIsSubmitting(false);
+                router.visit('/wallet');
+
+                return;
+            }
+
+            const loaded = await loadRazorpayScript();
+
+            if (!loaded || !window.Razorpay || !initiatePayload.gateway_data) {
+                setError('Could not load payment gateway. Please try again.');
+                setIsSubmitting(false);
+
+                return;
+            }
+
+            const gatewayData = initiatePayload.gateway_data;
+            const razorpay = new window.Razorpay({
+                ...gatewayData,
+                handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+                    try {
+                        await verifyRecharge(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
+                        router.visit('/wallet');
+                    } catch (verifyError) {
+                        setError(verifyError instanceof Error ? verifyError.message : 'Payment verification failed');
+                    } finally {
+                        setIsSubmitting(false);
+                    }
+                },
+                modal: {
+                    ondismiss: () => {
+                        setIsSubmitting(false);
+                    },
+                },
+            });
+
+            razorpay.open();
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : 'Failed to process recharge');
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -70,10 +180,7 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                 {/* Header */}
                 <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
                     <div className="mx-auto flex max-w-lg items-center gap-4 px-4 py-4">
-                        <button
-                            onClick={() => window.history.back()}
-                            className="rounded-lg p-2 hover:bg-gray-100"
-                        >
+                        <button onClick={() => window.history.back()} className="rounded-lg p-2 hover:bg-gray-100">
                             <ArrowLeft className="h-5 w-5" />
                         </button>
                         <h1 className="text-lg font-semibold">Add Money</h1>
@@ -90,13 +197,9 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Amount Input */}
                         <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">
-                                Enter Amount
-                            </label>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">Enter Amount</label>
                             <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-medium text-gray-500">
-                                    ₹
-                                </span>
+                                <span className="absolute top-1/2 left-4 -translate-y-1/2 text-xl font-medium text-gray-500">₹</span>
                                 <input
                                     type="number"
                                     value={amount}
@@ -107,7 +210,7 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                                     placeholder="0"
                                     min="10"
                                     max="50000"
-                                    className="w-full rounded-xl border border-gray-300 py-4 pl-10 pr-4 text-2xl font-semibold focus:border-emerald-500 focus:ring-emerald-500"
+                                    className="w-full rounded-xl border border-gray-300 py-4 pr-4 pl-10 text-2xl font-semibold focus:border-emerald-500 focus:ring-emerald-500"
                                 />
                             </div>
                             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -156,9 +259,7 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                                     <CreditCard className="h-6 w-6 text-gray-500" />
                                     <div>
                                         <p className="font-medium text-gray-900">Card / Net Banking</p>
-                                        <p className="text-xs text-gray-500">
-                                            Pay securely with your card or net banking
-                                        </p>
+                                        <p className="text-xs text-gray-500">Pay securely with your card or net banking</p>
                                     </div>
                                 </label>
 
@@ -180,9 +281,7 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                                     <Smartphone className="h-6 w-6 text-gray-500" />
                                     <div>
                                         <p className="font-medium text-gray-900">UPI</p>
-                                        <p className="text-xs text-gray-500">
-                                            GPay, PhonePe, Paytm & more
-                                        </p>
+                                        <p className="text-xs text-gray-500">GPay, PhonePe, Paytm & more</p>
                                     </div>
                                 </label>
                             </div>
@@ -197,14 +296,7 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                             {isSubmitting ? (
                                 <span className="flex items-center justify-center gap-2">
                                     <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
-                                        <circle
-                                            className="opacity-25"
-                                            cx="12"
-                                            cy="12"
-                                            r="10"
-                                            stroke="currentColor"
-                                            strokeWidth="4"
-                                        />
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                         <path
                                             className="opacity-75"
                                             fill="currentColor"
@@ -222,8 +314,8 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
                     {/* Info */}
                     <div className="mt-6 rounded-lg bg-gray-100 p-4">
                         <p className="text-xs text-gray-600">
-                            <strong>Note:</strong> Minimum recharge is ₹10, maximum is ₹50,000. Wallet
-                            balance can be used for orders and subscriptions.
+                            <strong>Note:</strong> Minimum recharge is ₹10, maximum is ₹50,000. Wallet balance can be used for orders and
+                            subscriptions.
                         </p>
                     </div>
                 </div>
@@ -231,4 +323,3 @@ export default function WalletRecharge({ wallet, suggestedAmounts }: Props) {
         </>
     );
 }
-

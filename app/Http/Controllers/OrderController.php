@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Services\CartService;
 use App\Services\CheckoutService;
 use App\Services\OrderStatusService;
+use App\Services\PaymentService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,8 @@ class OrderController extends Controller
         private CartService $cartService,
         private CheckoutService $checkoutService,
         private OrderStatusService $orderStatusService,
-        private WalletService $walletService
+        private WalletService $walletService,
+        private PaymentService $paymentService
     ) {}
 
     /**
@@ -144,6 +146,113 @@ class OrderController extends Controller
 
         return redirect()->route('orders.show', $result['order'])
             ->with('success', 'Order placed successfully! Order #'.$result['order']->order_number);
+    }
+
+    /**
+     * Initiate an online checkout and return gateway checkout payload.
+     */
+    public function initiatePayment(StoreOrderRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $sessionId = $request->session()->getId();
+        $validated = $request->validated();
+
+        $cart = $this->cartService->getOrCreateCart($user, $sessionId);
+
+        if ($cart->isEmpty()) {
+            return response()->json(['success' => false, 'error' => 'Your cart is empty.'], 422);
+        }
+
+        $paymentMethod = (string) ($validated['payment_method'] ?? 'upi');
+
+        if (! in_array($paymentMethod, ['upi', 'gateway'], true)) {
+            return response()->json(['success' => false, 'error' => 'Online payment method is required.'], 422);
+        }
+
+        $address = $user->addresses()->findOrFail($validated['user_address_id']);
+        $result = $this->checkoutService->processCheckout($cart, $user, $address, $validated);
+
+        if (! $result['success'] || ! isset($result['order'])) {
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'] ?? 'Unable to initiate checkout.',
+            ], 422);
+        }
+
+        $payment = $result['payment'] ?? null;
+
+        if (! $payment || ! isset($result['gateway_data'])) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Online payment initialization failed.',
+            ], 422);
+        }
+
+        $request->session()->put('checkout_payment_pending', [
+            'order_id' => $result['order']->id,
+            'payment_id' => $payment->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $result['order']->id,
+            'order_number' => $result['order']->order_number,
+            'gateway' => 'razorpay',
+            'gateway_data' => $result['gateway_data'],
+        ]);
+    }
+
+    /**
+     * Verify online payment signature and finalize order payment status.
+     */
+    public function verifyPayment(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'razorpay_order_id' => ['required', 'string'],
+            'razorpay_payment_id' => ['required', 'string'],
+            'razorpay_signature' => ['required', 'string'],
+        ]);
+
+        $pending = $request->session()->get('checkout_payment_pending');
+
+        if (! is_array($pending) || ! isset($pending['payment_id'], $pending['order_id'])) {
+            return response()->json(['success' => false, 'error' => 'Checkout payment session expired.'], 422);
+        }
+
+        $order = Order::query()->where('id', $pending['order_id'])->where('user_id', $request->user()->id)->first();
+
+        if (! $order) {
+            return response()->json(['success' => false, 'error' => 'Order not found.'], 404);
+        }
+
+        $payment = $order->payments()->where('id', $pending['payment_id'])->first();
+
+        if (! $payment) {
+            return response()->json(['success' => false, 'error' => 'Payment not found.'], 404);
+        }
+
+        $verifyResult = $this->paymentService->verifyRazorpayPayment(
+            $payment,
+            $validated['razorpay_order_id'],
+            $validated['razorpay_payment_id'],
+            $validated['razorpay_signature']
+        );
+
+        if (! $verifyResult['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $verifyResult['error'] ?? 'Payment verification failed.',
+            ], 422);
+        }
+
+        $request->session()->forget('checkout_payment_pending');
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'redirect_url' => route('orders.show', $order),
+        ]);
     }
 
     /**
