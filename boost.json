@@ -8,6 +8,7 @@
     "mcp": true,
     "sail": false,
     "skills": [
+        "laravel-best-practices",
         "wayfinder-development",
         "inertia-react-development",
         "tailwindcss-development"
