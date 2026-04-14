@@ -90,16 +90,16 @@ class WishlistTest extends TestCase
 
     public function test_admin_can_view_insights(): void
     {
-        $admin = User::factory()->create(['role' => 'admin']);
+        $admin = \App\Models\Admin::factory()->create();
         $product = Product::factory()->create();
         $product->zones()->attach($this->zone->id, ['is_available' => true, 'stock_quantity' => 10]);
-        // create some wishlists
         \App\Models\Wishlist::factory()->create([
             'user_id' => $this->user->id,
             'product_id' => $product->id,
         ]);
 
-        $response = $this->actingAs($admin, 'admin')
+        $response = $this->withoutVite()
+            ->actingAs($admin, 'admin')
             ->get(route('admin.wishlist-insights.index'));
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->has('stats.total_wishlisted_items')

@@ -1,7 +1,0 @@
-    public function addresses(): BelongsToMany
-    {
-        return $this->belongsToMany(UserAddress::class, 'route_user_address')
-            ->withPivot('sequence')
-            ->orderByPivot('sequence');
-    }
-}
