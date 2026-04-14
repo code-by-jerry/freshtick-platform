@@ -45,6 +45,8 @@ services:
         sync: false          # set in Render dashboard — never commit passwords
       - key: DB_SSLMODE
         value: require
+      - key: PGSSLMODE
+        value: require
 
       # ── Session / Cache / Queue ───────────────────────────────────────────
       - key: SESSION_DRIVER
