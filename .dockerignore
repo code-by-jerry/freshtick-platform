@@ -13,7 +13,6 @@ public/hot
 .phpunit.result.cache
 .phpunit.cache
 tests
-docker
 *.md
 .kiro
 .cursor
