@@ -1,58 +1,111 @@
 services:
   - type: web
     name: freshtick
-    runtime: php
+    runtime: docker
     plan: starter
     region: singapore
     branch: main
-    buildCommand: |
-      composer install --no-dev --optimize-autoloader --no-interaction
-      npm ci
-      npm run build
-      php artisan config:cache
-      php artisan route:cache
-      php artisan view:cache
-      php artisan event:cache
-    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /up
     envVars:
+      # ── App ──────────────────────────────────────────────────────────────
       - key: APP_NAME
         value: Freshtick
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
-        value: false
+        value: "false"
       - key: APP_KEY
         generateValue: true
       - key: APP_URL
-        value: https://freshtick.onrender.com
+        sync: false          # set to your actual Render URL after first deploy
       - key: APP_TIMEZONE
         value: Asia/Kolkata
+      - key: NEXT_DAY_DELIVERY_CUTOFF
+        value: "22:30"
+      - key: APP_LOCALE
+        value: en
+      - key: BCRYPT_ROUNDS
+        value: "12"
+
+      # ── Database (Supabase PostgreSQL) ────────────────────────────────────
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        sync: false
+        value: aws-1-ap-southeast-2.pooler.supabase.com
       - key: DB_PORT
-        value: 5432
+        value: "5432"
       - key: DB_DATABASE
         value: postgres
       - key: DB_USERNAME
-        sync: false
+        value: postgres.ouqggtrpiukjpuukcvjj
       - key: DB_PASSWORD
-        sync: false
+        sync: false          # set in Render dashboard — never commit passwords
       - key: DB_SSLMODE
         value: require
+
+      # ── Session / Cache / Queue ───────────────────────────────────────────
       - key: SESSION_DRIVER
         value: database
+      - key: SESSION_LIFETIME
+        value: "120"
       - key: CACHE_STORE
         value: database
       - key: QUEUE_CONNECTION
         value: database
+
+      # ── Logging ───────────────────────────────────────────────────────────
       - key: LOG_CHANNEL
         value: stderr
       - key: LOG_LEVEL
         value: error
+
+      # ── Filesystem ────────────────────────────────────────────────────────
       - key: FILESYSTEM_DISK
         value: local
-      - key: BCRYPT_ROUNDS
-        value: 12
+
+      # ── Google Maps ───────────────────────────────────────────────────────
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+
+      # ── Google OAuth ──────────────────────────────────────────────────────
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false          # https://your-render-url.onrender.com/auth/google/callback
+
+      # ── Payments ──────────────────────────────────────────────────────────
+      - key: PAYMENT_GATEWAY
+        value: razorpay
+      - key: PAYMENT_CURRENCY
+        value: INR
+      - key: PAYMENT_MOCK
+        value: "false"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # ── ImageKit ──────────────────────────────────────────────────────────
+      - key: IMAGEKIT_PUBLIC_KEY
+        sync: false
+      - key: IMAGEKIT_PRIVATE_KEY
+        sync: false
+      - key: IMAGEKIT_URL_ENDPOINT
+        sync: false
+
+      # ── Mail ──────────────────────────────────────────────────────────────
+      - key: MAIL_MAILER
+        value: log
+      - key: MAIL_FROM_ADDRESS
+        value: hello@freshtick.in
+      - key: MAIL_FROM_NAME
+        value: Freshtick
+
+      # ── SMS ───────────────────────────────────────────────────────────────
+      - key: SMS_DRIVER
+        value: log
