@@ -12,6 +12,10 @@ COPY resources/ resources/
 COPY vite.config.ts tsconfig.json ./
 COPY public/ public/
 
+# APP_URL is not needed at Vite build time — the laravel-vite-plugin
+# generates relative /build/assets/... paths in the manifest, which
+# Laravel then prefixes with APP_URL at runtime via the @vite() directive.
+# No VITE_ env vars needed here.
 RUN npm run build
 
 # ─────────────────────────────────────────────────────────────────────────────

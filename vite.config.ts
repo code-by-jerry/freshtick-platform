@@ -26,4 +26,8 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    build: {
+        // Ensure assets use relative paths so they work on any domain
+        assetsInlineLimit: 0,
+    },
 });

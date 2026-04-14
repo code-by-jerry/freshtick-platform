@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: APP_URL
         sync: false          # set to your actual Render URL after first deploy
+      - key: ASSET_URL
+        sync: false          # must match APP_URL exactly — controls CSS/JS asset paths
       - key: APP_TIMEZONE
         value: Asia/Kolkata
       - key: NEXT_DAY_DELIVERY_CUTOFF
