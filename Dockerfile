@@ -69,6 +69,9 @@ COPY . .
 # Copy built frontend assets from node stage
 COPY --from=node-builder /app/public/build public/build
 
+# Create .env from example before composer install so package:discover can run
+RUN cp .env.example .env && php -r "echo 'APP_KEY=base64:' . base64_encode(random_bytes(32)) . PHP_EOL;" >> .env
+
 # Install PHP dependencies (production only)
 RUN composer install \
     --no-dev \
@@ -76,9 +79,6 @@ RUN composer install \
     --no-interaction \
     --no-progress \
     --prefer-dist
-
-# Create .env from example (runtime env vars will override)
-RUN cp .env.example .env
 
 # Set correct permissions
 RUN chown -R www-data:www-data /var/www/html \
