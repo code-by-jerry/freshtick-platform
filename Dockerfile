@@ -82,8 +82,10 @@ RUN composer install \
     --no-interaction \
     --no-progress \
     --prefer-dist \
-    --no-scripts \
-    && php artisan package:discover --ansi
+    --no-scripts
+
+# Run package discovery separately so failures are clearly attributed
+RUN mkdir -p bootstrap/cache && php artisan package:discover --ansi
 
 # Set correct permissions
 RUN chown -R www-data:www-data /var/www/html \
